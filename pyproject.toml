@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "athlete"
+version = "0.1"
+description = "An API for reinforcement learning agents."
+readme = "README.md"
+authors = [
+    {name = "Sebastian Griesbach", email = "sebastian.griesbach@zoho.eu"}
+]
+requires-python = ">=3.9"
+license = {text = "MIT License"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "cpprb",
+    "gymnasium[classic_control]",
+    "torch>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Sebastian-Griesbach/athlete"
+Repository = "https://github.com/Sebastian-Griesbach/athlete"
+
+[tool.setuptools]
+packages = ["athlete"]
+include-package-data = true
