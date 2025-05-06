@@ -52,7 +52,7 @@ Regardless of whether you want to create an application that uses RL for researc
 You can install Athlete either directly from PyPI:
 
 ```bash
-pip install athlete
+pip install rl-athlete
 ```
 
 Or install it from source:

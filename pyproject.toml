@@ -3,7 +3,7 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "athlete"
+name = "rl-athlete"
 version = "0.1"
 description = "An API for reinforcement learning agents."
 readme = "README.md"
