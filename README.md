@@ -59,8 +59,8 @@ Or install it from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/username/athlete.git #TODO Put real URL
-cd athlete
+git clone https://github.com/Sebastian-Griesbach/Athlete.git
+cd Athlete
 
 # Install in development mode
 pip install -e .
