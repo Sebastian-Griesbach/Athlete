@@ -116,8 +116,9 @@ for _ in range(100000):
         observation, env_info = train_env.reset()
         action, agent_info = agent.reset_step(observation, env_info)
 
-# Switch to evaluation mode to disable exploration and updates
+# Create evaluation environment
 eval_env = gym.make("CartPole-v1", render_mode="human")
+# Switch to evaluation mode to disable exploration and updates
 agent.eval()
 for _ in range(10):
     observation, env_info = eval_env.reset()
@@ -245,7 +246,7 @@ Creates an agent with the specified algorithm. The `**kwargs` parameter allows y
 import athlete
 import gymnasium as gym
 
-env = gym.make("BipedalWalker-v3")
+env = gym.make("BipedalWalker-v3") #Separately install Box2D environments.
 
 agent = athlete.make(
     algorithm_id="sac",
