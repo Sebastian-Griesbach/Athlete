@@ -5,6 +5,9 @@ from athlete.saving.saveable_component import (
     SaveContext,
 )
 
+# TODO remove the PolicyBuilder class and instead let the components factory build training and evaluation policies
+# This also includes removing the "changes policy" indicator from the UpdatableComponents
+
 
 class Policy(ABC):
     """Abstract interface for reinforcement learning policies.

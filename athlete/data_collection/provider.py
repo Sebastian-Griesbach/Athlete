@@ -1,6 +1,8 @@
 from typing import Any, Dict, Optional, Tuple
 
 
+# TODO remove data provider and add this functionality to the data collector,
+# pass the get data function to the updatable components that needs to access the data
 class UpdateDataProvider:
     """A communication channel between data collectors and update rules.
 

@@ -7,6 +7,9 @@ import torch
 from athlete.saving.saveable_component import SaveContext
 
 
+# TODO include a functionality to externally register and increment counter in the step tracker
+# This way Updatable components that remember when they have been last updated don't need to
+# save this information themselves
 class StepTracker:
     """The StepTracker holds the number of interactions, episodes and datapoints added to the replay buffer.
     This information might be useful for updating conditions. This class can be used as a singleton.
@@ -120,7 +123,7 @@ class StepTracker:
 
 class RNGHandler:
     """This class handles random number generation to ensure reproducibility across training runs.
-    It should be used as a singleton. It sets the global seed for numpy and torch as well as provides 
+    It should be used as a singleton. It sets the global seed for numpy and torch as well as provides
     a consistent random number generator instance from numpy that can be accessed throughout the codebase.
     """
 
