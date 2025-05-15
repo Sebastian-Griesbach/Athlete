@@ -410,6 +410,8 @@ class Agent(CompositeSaveableComponent):
         updated_configuration = algorithm.default_configuration.copy()
         updated_configuration.update(kwargs)
 
+        # TODO could add a check here if all keys of kwargs are in the default configuration
+
         # RNG Handler
         rng_handler = RNGHandler(seed)
         RNGHandler.set_global_instance(rng_handler=rng_handler)

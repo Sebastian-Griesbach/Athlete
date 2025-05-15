@@ -161,7 +161,7 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             )
         else:
             self.temperature = torch.nn.Parameter(
-                torch.log(torch.tensor(self.temperature, requires_grad=False))
+                torch.log(torch.tensor(temperature, requires_grad=False))
             )
 
         if target_entropy == self.SETTING_AUTO:
