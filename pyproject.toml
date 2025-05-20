@@ -20,7 +20,7 @@ classifiers = [
 dependencies = [
     "numpy",
     "cpprb",
-    "gymnasium[classic_control]",
+    "gymnasium[classic-control]",
     "torch>=2.0.0",
 ]
 
