@@ -28,7 +28,6 @@ class SACCriticUpdate(TorchFrequentGradientUpdate):
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
-        changes_policy: bool = False,
         gradient_max_norm: float = None,
         log_tag: str = CRITIC_LOSS_LOG_TAG,
         save_file_name: str = SAVE_HANDLING_STATS,
@@ -49,14 +48,12 @@ class SACCriticUpdate(TorchFrequentGradientUpdate):
             update_frequency (int, optional): The frequency in which this updated is applied according to the environment steps. If -1, it is applied at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to perform per call. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the environment steps since the last update. Defaults to False.
-            changes_policy (bool, optional): Whether applying this update immediately changes the policy, for regular SAC this is False. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
             log_tag (str, optional): Log tag for the loss. Defaults to "critic_loss".
             save_file_name (str, optional): File name for saving handling stats. Defaults to "sac_value_update_handling_stats".
         """
         super().__init__(
             optimizer=critic_optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,
@@ -139,7 +136,6 @@ class SACActorUpdate(TorchFrequentGradientUpdate):
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
         gradient_max_norm: float = None,
-        changes_policy: bool = True,
         log_tag: str = ACTOR_LOSS_LOG_TAG,
         save_file_name: str = SAVE_HANDLING_STATS,
     ) -> None:
@@ -157,13 +153,11 @@ class SACActorUpdate(TorchFrequentGradientUpdate):
             number_of_updates (int, optional): The number of updates to perform per call. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the environment steps since the last update. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
-            changes_policy (bool, optional): Whether applying this update immediately changes the policy, for regular SAC this is True. Defaults to True.
             log_tag (str, optional): Log tag for the loss. Defaults to "actor_loss".
             save_file_name (str, optional): File name for saving handling stats. Defaults to "sac_actor_update_handling_stats".
         """
         super().__init__(
             optimizer=actor_optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,
@@ -219,7 +213,6 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
-        changes_policy: bool = False,
         gradient_max_norm: float = None,
         temperature_log_tag: str = TEMPERATURE_LOG_TAG,
         loss_log_tag: str = TEMPERATURE_LOSS_LOG_TAG,
@@ -237,7 +230,6 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
             update_frequency (int, optional): The frequency in which this updated is applied according to the environment steps. If -1, it is applied at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to perform per call. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the environment steps since the last update. Defaults to False.
-            changes_policy (bool, optional): Whether applying this update immediately changes the policy, for regular SAC this is False. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
             temperature_log_tag (str, optional): Log tag used for the log temperature loss. Defaults to "temperature_loss".
             loss_log_tag (str, optional): Log tag used to log the current temperature. Defaults to "temperature".
@@ -245,7 +237,6 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
         """
         super().__init__(
             optimizer=temperature_optimizer,
-            changes_policy=changes_policy,
             log_tag=loss_log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,

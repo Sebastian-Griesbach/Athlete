@@ -12,16 +12,10 @@ class UpdatableComponent(ABC):
 
     def __init__(
         self,
-        changes_policy: bool,
     ) -> None:
-        """Initialise the updatable component.
-
-        Args:
-            changes_policy (bool): Whether updating this component immediately changes the policy.
-        """
+        """Initialise the updatable component."""
 
         super().__init__()
-        self.changes_policy = changes_policy
 
     @abstractmethod
     def update(self) -> Dict[str, Any]:
@@ -67,17 +61,15 @@ class UpdateRule(ABC):
             Tuple[bool, Dict[str, Any]]: A boolean indicating whether the policy has changed and accumulated logging information from all components.
         """
         accumulated_logs = {}
-        policy_changed = False
 
         for component in self.updatable_components:
             # Only update components that meet their update condition
             if component.update_condition:
                 component_logs = component.update()
-                policy_changed |= component.changes_policy
                 if component_logs:
                     accumulated_logs.update(component_logs)
 
-        return policy_changed, accumulated_logs
+        return accumulated_logs
 
     @property
     @abstractmethod

@@ -195,7 +195,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             discount=discount,
             target_noise_std=target_noise_std,
             target_noise_clip=target_noise_clip,
-            changes_policy=False,
             update_frequency=critic_update_frequency,
             number_of_updates=critic_number_of_updates,
             multiply_number_of_updates_by_environment_steps=(
@@ -222,7 +221,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             actor=self.actor,
             actor_optimizer=self.actor_optimizer,
             critic=self.critic_1,
-            changes_policy=True,
             update_frequency=actor_update_frequency,
             number_of_updates=actor_number_of_updates,
             multiply_number_of_updates_by_environment_steps=(
@@ -239,7 +237,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             source_net=self.critic_1,
             target_net=self.target_critic_1,
             tau=target_critic_tau,
-            changes_policy=False,
             update_frequency=target_critic_update_frequency,
         )
 
@@ -247,7 +244,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             source_net=self.critic_2,
             target_net=self.target_critic_2,
             tau=target_critic_tau,
-            changes_policy=False,
             update_frequency=target_critic_update_frequency,
         )
 
@@ -256,7 +252,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             source_net=self.actor,
             target_net=self.target_actor,
             tau=target_actor_tau,
-            changes_policy=False,
             update_frequency=target_actor_update_frequency,
         )
 

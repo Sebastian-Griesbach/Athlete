@@ -25,7 +25,6 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
     def __init__(
         self,
         optimizer: Optimizer,
-        changes_policy: bool,
         log_tag: str,
         save_file_name: str,
         update_frequency: int = 1,
@@ -37,7 +36,6 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
 
         Args:
             optimizer (Optimizer): The optimizer to be used for the update.
-            changes_policy (bool): Whether updating this component immediately changes the policy.
             log_tag (str): The tag used for logging the resulting loss
             save_file_name (str): The name of the file to save the state of the component to.
             update_frequency (int, optional): The frequency of the update according to the number of environment interactions.
@@ -46,7 +44,7 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is performed. Defaults to None.
         """
-        UpdatableComponent.__init__(self, changes_policy=changes_policy)
+        UpdatableComponent.__init__(self)
 
         self.optimizer = optimizer
         self.update_frequency = update_frequency
@@ -187,7 +185,6 @@ class TargetNetUpdate(UpdatableComponent):
         source_net: torch.nn.Module,
         target_net: torch.nn.Module,
         tau: Optional[float] = None,
-        changes_policy: bool = False,
         update_frequency: int = 1,
     ) -> None:
         """Initializes the TargetNetUpdate class with the given parameters.
@@ -196,10 +193,9 @@ class TargetNetUpdate(UpdatableComponent):
             source_net (torch.nn.Module): The source network to be used for the update.
             target_net (torch.nn.Module): The target network to be updated.
             tau (Optional[float], optional): Tau value for soft update. If None, a hard update is performed. Defaults to None.
-            changes_policy (bool, optional): Whether this update immediately changes the resulting policy (usually this is not the case for target networks). Defaults to False.
             update_frequency (int, optional): Frequency of the update according to the number of environment interactions. Defaults to 1.
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
 
         self.source_net = source_net
         self.target_net = target_net
@@ -250,7 +246,6 @@ class ReplayBufferUpdate(UpdatableComponent):
         self,
         update_data_provider: UpdateDataProvider,
         replay_buffer: Buffer,
-        changes_policy: bool = False,
     ) -> None:
         """Initializes a replay buffer updatable component.
 
@@ -258,9 +253,8 @@ class ReplayBufferUpdate(UpdatableComponent):
         Args:
             update_data_provider (UpdateDataProvider): UpdateDataProvider instance to provide the data for the replay buffer.
             replay_buffer (Buffer): The replay buffer itself to add the data to.
-            changes_policy (bool, optional): Whether this update immediately changes the policy. For most algorithms this will be False. Defaults to False.
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
 
         self.update_data_provider = update_data_provider
         self.replay_buffer = replay_buffer

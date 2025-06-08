@@ -19,7 +19,6 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
         optimizer: torch.optim.Optimizer,
         data_sampler: Callable[[None], Dict[str, torch.tensor]],
         cross_validation: bool = False,
-        changes_policy: bool = True,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -39,8 +38,6 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
                 in the form of a dictionary upon calling it.
             cross_validation (bool, optional): Weather to use cross-validation for the target calculation. Also
                 known as double DQN. Defaults to False.
-            changes_policy (bool, optional): Whether the policy changes immediately when performing this update.
-                For regular DQN, this is True. Defaults to True.
             update_frequency (int, optional): Update frequency of the Q-value function according to the number of
                 environment steps. If -1, the update is performed at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to perform at each update step. Defaults to 1.
@@ -53,7 +50,6 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
         """
         super().__init__(
             optimizer=optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,

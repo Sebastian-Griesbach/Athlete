@@ -18,7 +18,6 @@ class QTableUpdate(UpdatableComponent):
         q_table: np.ndarray,
         learning_rate: float,
         discount: float,
-        changes_policy: bool = True,
         loss_log_tag: str = LOG_TAG_LOSS,
     ) -> None:
         """Initializes the Q table update component.
@@ -28,11 +27,9 @@ class QTableUpdate(UpdatableComponent):
             q_table (np.ndarray): The Q table to be updated.
             learning_rate (float): The learning rate for the Q table update.
             discount (float): The discount factor for the Q table update.
-            changes_policy (bool, optional): Whether the policy changes immediately when performing this update.
-                For regular Q-learning this is true. Defaults to True.
             loss_log_tag (str, optional): The tag used for logging the loss. Defaults to 'loss'.
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
 
         self.update_data_provider = update_data_provider
         self.q_table = q_table

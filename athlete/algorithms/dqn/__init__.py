@@ -6,8 +6,8 @@ import torch
 import athlete
 from athlete.update.update_rule import UpdateRule
 from athlete.algorithms.dqn.update import DQNUpdate
-from athlete.policy.policy_builder import PolicyBuilder
-from athlete.algorithms.dqn.policy import DQNPolicyBuilder
+from athlete.policy.policy import Policy
+from athlete.algorithms.dqn.policy import DQNTrainingPolicy, DQNEvaluationPolicy
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.module.torch.common import FCDiscreteQValueFunction
 from athlete import constants
@@ -77,7 +77,7 @@ DEFAULT_CONFIGURATION = {
 
 def make_dqn_components(
     observation_space: Space, action_space: Space, configuration: Dict[str, Any]
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
     """Creates the components for a DQN agent.
 
     Args:
@@ -86,7 +86,7 @@ def make_dqn_components(
         configuration: Algorithm configuration dictionary
 
     Returns:
-        Tuple containing data collector, update rule and policy builder
+        Tuple containing data collector, update rule training policy, and evaluation policy
 
     Raises:
         ValueError: If observation_space is not Box or action_space is not Discrete
@@ -152,9 +152,9 @@ def make_dqn_components(
         ],
     )
 
-    # POLICY BUILDER
+    # POLICY
 
-    policy_builder = DQNPolicyBuilder(
+    training_policy = DQNTrainingPolicy(
         q_value_function=update_rule.q_value_function,
         action_space=action_space,
         start_epsilon=configuration[ARGUMENT_START_EPSILON],
@@ -165,7 +165,14 @@ def make_dqn_components(
         ],
     )
 
-    return data_collector, update_rule, policy_builder
+    evaluation_policy = DQNEvaluationPolicy(
+        q_value_function=update_rule.q_value_function,
+        post_replay_buffer_preprocessing=configuration[
+            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
+        ],
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

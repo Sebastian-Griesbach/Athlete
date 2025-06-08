@@ -89,7 +89,6 @@ class PPOUpdate(UpdateRule, CompositeSaveableComponent):
             discount=discount,
             generalized_advantage_estimation_lambda=generalized_advantage_estimation_lambda,
             on_policy_buffer=self.buffer,
-            changes_policy=False,
             save_file_name=PPOBufferUpdate.SAVE_FILE_NAME,
         )
 
@@ -113,7 +112,6 @@ class PPOUpdate(UpdateRule, CompositeSaveableComponent):
             value_loss_log_tag=PPOGradientUpdate.VALUE_LOSS_LOG_TAG,
             entropy_loss_log_tag=PPOGradientUpdate.ENTROPY_LOSS_LOG_TAG,
             total_loss_log_tag=PPOGradientUpdate.TOTAL_LOSS_LOG_TAG,
-            changes_policy=True,
             save_file_name=PPOGradientUpdate.SAVE_FILE_NAME,
         )
 

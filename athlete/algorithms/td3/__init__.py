@@ -10,10 +10,14 @@ from athlete.data_collection.transition import (
 )
 from athlete.update.update_rule import UpdateRule
 from athlete.algorithms.td3.update import TD3Update
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.module.torch.common import FCContinuousQValueFunction, FCDeterministicActor
-from athlete.algorithms.ddpg.policy import INFO_KEY_UNSCALED_ACTION, DDPGPolicyBuilder
+from athlete.algorithms.ddpg.policy import (
+    INFO_KEY_UNSCALED_ACTION,
+    DDPGTrainingPolicy,
+    DDPGEvaluationPolicy,
+)
 from athlete.policy.noise import GaussianNoise
 from athlete import constants
 
@@ -111,7 +115,7 @@ DEFAULT_CONFIGURATION = {
 
 def make_td3_components(
     observation_space: Space, action_space: Space, configuration: Dict[str, Any]
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
 
     if not isinstance(observation_space, Box):
         raise ValueError(
@@ -198,7 +202,7 @@ def make_td3_components(
         ],
     )
 
-    # POLICY BUILDER
+    # POLICY
     configuration[ARGUMENT_NOISE_PROCESS_ARGUMENTS].update(
         {"shape": action_space.shape}
     )
@@ -207,8 +211,8 @@ def make_td3_components(
         **configuration[ARGUMENT_NOISE_PROCESS_ARGUMENTS]
     )
 
-    # TD3 uses the same policy builder as DDPG
-    policy_builder = DDPGPolicyBuilder(
+    # TD3 uses the same policy as DDPG
+    training_policy = DDPGTrainingPolicy(
         noise_process=noise_process,
         actor=actor,
         action_space=action_space,
@@ -217,7 +221,15 @@ def make_td3_components(
         ],
     )
 
-    return data_collector, update_rule, policy_builder
+    evaluation_policy = DDPGEvaluationPolicy(
+        actor=actor,
+        action_space=action_space,
+        post_replay_buffer_preprocessing=configuration[
+            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
+        ],
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

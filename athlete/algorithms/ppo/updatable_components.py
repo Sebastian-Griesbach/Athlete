@@ -36,7 +36,6 @@ class PPOBufferUpdate(UpdatableComponent):
         discount: float,
         generalized_advantage_estimation_lambda: float,
         on_policy_buffer: OnPolicyBuffer,
-        changes_policy: bool = False,
         save_file_name: str = SAVE_FILE_NAME,
     ) -> None:
         """Initializes the PPOBufferUpdate class.
@@ -47,11 +46,9 @@ class PPOBufferUpdate(UpdatableComponent):
             discount (float): The discount factor used to calculate the return.
             generalized_advantage_estimation_lambda (float): The lambda value used for generalized advantage estimation.
             on_policy_buffer (OnPolicyBuffer): The on-policy buffer used to store the data.
-            changes_policy (bool, optional): Whether this update immediately changes the policy.
-                For regular PPO, this is False. Defaults to False.
             save_file_name (str, optional): The name of the file to save the handling stats. Defaults to "ppo_buffer_update".
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
         self.update_data_provider = update_data_provider
         self.value_function = value_function
         self.discount = discount
@@ -205,7 +202,6 @@ class PPOGradientUpdate(UpdatableComponent):
         value_loss_log_tag: str = VALUE_LOSS_LOG_TAG,
         entropy_loss_log_tag: str = ENTROPY_LOSS_LOG_TAG,
         total_loss_log_tag: str = TOTAL_LOSS_LOG_TAG,
-        changes_policy: bool = True,
         save_file_name: str = SAVE_FILE_NAME,
     ) -> None:
         """Initializes the PPO gradient updatable component.
@@ -225,10 +221,9 @@ class PPOGradientUpdate(UpdatableComponent):
             value_loss_log_tag (str, optional): The tag used for logging the value loss. Defaults to 'value_loss'.
             entropy_loss_log_tag (str, optional): The tag used for logging the entropy loss. Defaults to 'entropy_loss'.
             total_loss_log_tag (str, optional): The tag used for logging the total loss. Defaults to 'loss'.
-            changes_policy (bool, optional): Whether this update immediately changes the policy. For regular PPO this is True. Defaults to True.
             save_file_name (str, optional): The name of the file to save the handling stats. Defaults to 'ppo_gradient_update'.
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
         self.value_function = value_function
         self.on_policy_buffer = on_policy_buffer
         self.actor = actor

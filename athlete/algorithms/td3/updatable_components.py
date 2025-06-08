@@ -26,7 +26,6 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
         discount: float = 0.99,
         target_noise_std: float = 0.2,
         target_noise_clip: float = 0.5,
-        changes_policy: bool = False,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -48,7 +47,6 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
             discount (float, optional): The discount factor for the value update. Defaults to 0.99.
             target_noise_std (float, optional): The standard deviation of the noise to add to the target actions. Defaults to 0.2.
             target_noise_clip (float, optional): The maximum absolute value of the noise to add to the target actions. Defaults to 0.5.
-            changes_policy (bool, optional): Whether this update immediately changes the policy. For regular TD3 this is False. Defaults to False.
             update_frequency (int, optional): The update frequency according to the number of environment steps. If -1 an update is performed at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to perform at each update step. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
@@ -59,7 +57,6 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
         """
         super().__init__(
             optimizer=critic_optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,

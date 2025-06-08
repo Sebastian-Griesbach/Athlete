@@ -9,12 +9,16 @@ from athlete.data_collection.transition import (
     ActionReplacementGymnasiumTransitionDataCollector,
 )
 from athlete.update.update_rule import UpdateRule
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.algorithms.sac.update import SACUpdate
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.algorithms.sac.module import GaussianActor
 from athlete.module.torch.common import FCContinuousQValueFunction
-from athlete.algorithms.sac.policy import INFO_KEY_UNSCALED_ACTION, SACPolicyBuilder
+from athlete.algorithms.sac.policy import (
+    INFO_KEY_UNSCALED_ACTION,
+    SACTrainingPolicy,
+    SACEvaluationPolicy,
+)
 from athlete import constants
 
 # Soft Actor-Critic
@@ -109,7 +113,7 @@ DEFAULT_CONFIGURATION = {
 
 def make_sac_components(
     observation_space: Space, action_space: Space, configuration: Dict[str, Any]
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
     """Creates the components for a SAC agent.
 
     Args:
@@ -118,7 +122,7 @@ def make_sac_components(
         configuration: Algorithm configuration dictionary
 
     Returns:
-        Tuple containing data collector, update rule and policy builder
+        Tuple containing data collector, update rule, training policy, and evaluation policy.
 
     Raises:
         ValueError: If observation_space or action_space is not Box
@@ -206,16 +210,25 @@ def make_sac_components(
         ],
     )
 
-    # POLICY BUILDER
-    policy_builder = SACPolicyBuilder(
-        actor=update_rule.actor,
+    # POLICY
+
+    training_policy = SACTrainingPolicy(
+        actor=actor,
         action_space=action_space,
         post_replay_buffer_preprocessing=configuration[
             ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
         ],
     )
 
-    return data_collector, update_rule, policy_builder
+    evaluation_policy = SACEvaluationPolicy(
+        actor=actor,
+        action_space=action_space,
+        post_replay_buffer_preprocessing=configuration[
+            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
+        ],
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

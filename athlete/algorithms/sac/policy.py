@@ -5,7 +5,7 @@ from gymnasium.spaces import Box
 
 from athlete.function import numpy_to_tensor, tensor_to_numpy
 from athlete.global_objects import StepTracker, RNGHandler
-from athlete.policy.policy_builder import Policy, PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.algorithms.sac.module import SACActor
 
 INFO_KEY_UNSCALED_ACTION = "unscaled_action"
@@ -124,60 +124,3 @@ class SACEvaluationPolicy(Policy):
         action = tensor_to_numpy(action).squeeze()
         scaled_action = action * self.action_scales + self.action_offsets
         return scaled_action, {INFO_KEY_UNSCALED_ACTION: action}
-
-
-class SACPolicyBuilder(PolicyBuilder):
-    """The SAC policy builder."""
-
-    def __init__(
-        self,
-        actor: SACActor,
-        action_space: Box,
-        post_replay_buffer_preprocessing: Optional[Callable[[Any], Any]] = None,
-    ) -> None:
-        """Initializes the SAC policy builder.
-
-        Args:
-            actor (SACActor): The SAC actor to use for action selection.
-            action_space (Box): The action space of the environment.
-            post_replay_buffer_preprocessing (Optional[Callable[[Any], Any]], optional):
-                A function to preprocess the observation before passing it to the actor. Defaults to None.
-        """
-        super().__init__()
-        self.actor = actor
-        self.action_space = action_space
-        self.post_replay_buffer_preprocessing = post_replay_buffer_preprocessing
-
-    def build_training_policy(self) -> Policy:
-        """Creates the training policy for SAC.
-
-        Returns:
-            Policy: The training policy for SAC.
-        """
-        return SACTrainingPolicy(
-            actor=self.actor,
-            action_space=self.action_space,
-            post_replay_buffer_preprocessing=self.post_replay_buffer_preprocessing,
-        )
-
-    def build_evaluation_policy(self) -> Policy:
-        """Creates the evaluation policy for SAC.
-
-        Returns:
-            Policy: The evaluation policy for SAC.
-        """
-        return SACEvaluationPolicy(
-            actor=self.actor,
-            action_space=self.action_space,
-            post_replay_buffer_preprocessing=self.post_replay_buffer_preprocessing,
-        )
-
-    @property
-    def requires_rebuild_on_policy_change(self) -> bool:
-        """Whether the policy builder requires a rebuild on policy change.
-
-        Returns:
-            bool: False, as the update only changes the weights of the actor which are
-            referenced by the policy classes.
-        """
-        return False

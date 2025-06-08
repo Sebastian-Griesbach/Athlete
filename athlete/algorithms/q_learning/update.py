@@ -52,7 +52,6 @@ class QLearningUpdate(UpdateRule, CompositeSaveableComponent):
             learning_rate=learning_rate,
             discount=discount,
             loss_log_tag=QTableUpdate.LOG_TAG_LOSS,
-            changes_policy=True,
         )
 
     @property

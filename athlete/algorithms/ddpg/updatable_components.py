@@ -22,7 +22,6 @@ class DDPGCriticUpdate(TorchFrequentGradientUpdate):
         critic_optimizer: Optimizer,
         target_actor: torch.nn.Module,
         discount: float = 0.99,
-        changes_policy: bool = False,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -41,7 +40,6 @@ class DDPGCriticUpdate(TorchFrequentGradientUpdate):
             critic_optimizer (Optimizer): The Torch optimizer used to update the critic network.
             target_actor (torch.nn.Module): The target actor network which is used to calculate the target value.
             discount (float, optional): The discount factor for the target value. Defaults to 0.99.
-            changes_policy (bool, optional): Whether the update changes the policy immediately, for regular DDPG this is False. Defaults to False.
             update_frequency (int, optional): The frequency of applying this update according to the environment steps. If -1, the update is applied at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to be applied at each update frequency. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether the number of updates is multiplied by the environment steps since the last update. Defaults to False.
@@ -52,7 +50,6 @@ class DDPGCriticUpdate(TorchFrequentGradientUpdate):
         """
         super().__init__(
             optimizer=critic_optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,
@@ -139,7 +136,6 @@ class DDPGActorUpdate(TorchFrequentGradientUpdate):
         actor: torch.nn.Module,
         actor_optimizer: torch.nn.Module,
         critic: torch.nn.Module,
-        changes_policy: bool = True,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -155,7 +151,6 @@ class DDPGActorUpdate(TorchFrequentGradientUpdate):
             actor (torch.nn.Module): The actor network which is being updated.
             actor_optimizer (torch.nn.Module): The Torch optimizer used to update the actor network.
             critic (torch.nn.Module): The critic network which is used to calculate the actor loss.
-            changes_policy (bool, optional): Whether the update changes the policy immediately, for regular DDPG this is True. Defaults to True.
             update_frequency (int, optional): The frequency of applying this update according to the environment steps. If -1, the update is applied at the end of each episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to be applied at each update frequency. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether the number of updates is multiplied by the environment steps since the last update. Defaults to False.
@@ -165,7 +160,6 @@ class DDPGActorUpdate(TorchFrequentGradientUpdate):
         """
         super().__init__(
             optimizer=actor_optimizer,
-            changes_policy=changes_policy,
             log_tag=log_tag,
             save_file_name=save_file_name,
             update_frequency=update_frequency,
