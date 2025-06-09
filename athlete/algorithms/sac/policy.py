@@ -55,7 +55,7 @@ class SACTrainingPolicy(Policy):
             Tuple[int, Dict[str, Any]]: A tuple containing the sampled action as a numpy array and a dictionary containing the unscaled action.
         """
 
-        if not self.step_tracker.warmup_is_done:
+        if not self.step_tracker.is_warmup_done:
             random_action = self.random_number_generator.random(
                 size=self.action_space.shape
             )

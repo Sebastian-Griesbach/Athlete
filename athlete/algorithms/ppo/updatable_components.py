@@ -26,8 +26,6 @@ class PPOBufferUpdate(UpdatableComponent):
     gradient updates.
     """
 
-    SAVE_FILE_NAME = "ppo_buffer_update"
-
     # Prepares Data and puts it into the buffer
     def __init__(
         self,
@@ -36,6 +34,7 @@ class PPOBufferUpdate(UpdatableComponent):
         discount: float,
         generalized_advantage_estimation_lambda: float,
         on_policy_buffer: OnPolicyBuffer,
+        # TODO continue updating step tracker implementations (updateable components, and update rules, no more saving required)
         save_file_name: str = SAVE_FILE_NAME,
     ) -> None:
         """Initializes the PPOBufferUpdate class.
@@ -59,8 +58,10 @@ class PPOBufferUpdate(UpdatableComponent):
         self.on_policy_buffer = on_policy_buffer
 
         self.device = value_function.parameters().__next__().device
-        self._last_update_datapoint = 0
         self.step_tracker = StepTracker.get_instance()
+        self._last_datapoint_updated_on_tracker_id = self.step_tracker.register_tracker(
+            id="ppo_buffer_last_datapoint_updated_on"
+        )
 
         self.save_file_name = save_file_name
 
@@ -125,7 +126,10 @@ class PPOBufferUpdate(UpdatableComponent):
 
         self.on_policy_buffer.set_data(data_dict=data)
 
-        self._last_update_datapoint = self.step_tracker.total_number_of_datapoints_added
+        self.step_tracker.set_tracker_value(
+            id=self._last_datapoint_updated_on_tracker_id,
+            value=self.step_tracker.get_tracker_value(id=constants.TRACKER_DATA_POINTS),
+        )
 
     @property
     def update_condition(self) -> bool:
@@ -134,36 +138,14 @@ class PPOBufferUpdate(UpdatableComponent):
         Returns:
             bool: True if the the data collector has finished collecting a new batch of data (a datapoint).
         """
-        return (
-            self.step_tracker.total_number_of_datapoints_added
-            > self._last_update_datapoint
+        return self.step_tracker.get_tracker_value(
+            id=constants.TRACKER_DATA_POINTS
+        ) > self.step_tracker.get_tracker_value(
+            id=self._last_datapoint_updated_on_tracker_id
         )
 
-    def save_checkpoint(self, context: SaveContext):
-        """Saves when the last update was performed.
 
-        Args:
-            context (SaveContext): The context used to save the checkpoint.
-        """
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = (self._last_update_datapoint,)
-
-        context.file_handler.save_to_file(to_save=handling_stats, save_path=save_path)
-
-    def load_checkpoint(self, context: SaveContext):
-        """Loads the last update from the checkpoint.
-
-        Args:
-            context (SaveContext): The context used to load the checkpoint.
-        """
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = context.file_handler.load_from_file(load_path=save_path)
-
-        self._last_update_datapoint = handling_stats[0]
+# TODO continue updating the imlemenation of step tracker
 
 
 class PPOGradientUpdate(UpdatableComponent):
@@ -179,8 +161,6 @@ class PPOGradientUpdate(UpdatableComponent):
     VALUE_LOSS_LOG_TAG = "value_loss"
     ENTROPY_LOSS_LOG_TAG = "entropy_loss"
     TOTAL_LOSS_LOG_TAG = "loss"
-
-    SAVE_FILE_NAME = "ppo_gradient_update"
 
     ZERO_DIVISION_CONSTANT = 1e-8
 
@@ -238,7 +218,11 @@ class PPOGradientUpdate(UpdatableComponent):
         self.batch_normalize_advantage = batch_normalize_advantage
 
         self.step_tracker = StepTracker.get_instance()
-        self._last_update_datapoint = 0
+        self._last_interaction_updated_on_tracker_id = (
+            self.step_tracker.register_tracker(
+                id="ppo_update_last_interaction_updated_on"
+            )
+        )
 
         self.policy_loss_log_tag = policy_loss_log_tag
         self.value_loss_log_tag = value_loss_log_tag
@@ -295,7 +279,12 @@ class PPOGradientUpdate(UpdatableComponent):
         for key, value in total_logging_info.items():
             total_logging_info[key] = sum(value) / len(value)
 
-        self._last_update_datapoint = self.step_tracker.total_number_of_datapoints_added
+        self.step_tracker.set_tracker_value(
+            id=self._last_interaction_updated_on_tracker_id,
+            value=self.step_tracker.get_tracker_value(
+                id=constants.TRACKER_ENVIRONMENT_INTERACTIONS
+            ),
+        )
 
         return total_logging_info
 
@@ -395,37 +384,8 @@ class PPOGradientUpdate(UpdatableComponent):
         Returns:
             bool: True when new data is available and the warmup is done.
         """
-        # Do an update as soon as new data is available
-        return (
-            self.step_tracker.warmup_is_done
-            and self.step_tracker.total_number_of_datapoints_added
-            > self._last_update_datapoint
+        return self.step_tracker.is_warmup_done and self.step_tracker.get_tracker_value(
+            id=constants.TRACKER_DATA_POINTS
+        ) > self.step_tracker.get_tracker_value(
+            id=self._last_datapoint_updated_on_tracker_id
         )
-
-    def save_checkpoint(self, context: SaveContext):
-        """Saves when the last update was performed.
-
-        Args:
-            context (SaveContext): The context used to save the checkpoint.
-        """
-
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = (self._last_update_datapoint,)
-
-        context.file_handler.save_to_file(to_save=handling_stats, save_path=save_path)
-
-    def load_checkpoint(self, context: SaveContext):
-        """Loads the last update from the checkpoint.
-
-        Args:
-            context (SaveContext): The context used to load the checkpoint.
-        """
-
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = context.file_handler.load_from_file(load_path=save_path)
-
-        self._last_update_datapoint = handling_stats[0]

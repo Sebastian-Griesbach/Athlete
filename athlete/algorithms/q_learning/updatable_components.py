@@ -70,4 +70,4 @@ class QTableUpdate(UpdatableComponent):
         Returns:
             bool: True if the warmup is done.
         """
-        return self.step_tracker.warmup_is_done
+        return self.step_tracker.is_warmup_done

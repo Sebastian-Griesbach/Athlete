@@ -134,7 +134,7 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         if self.update_frequency > 0:
             # Update if training frequency is met
             return (
-                self.step_tracker.warmup_is_done
+                self.step_tracker.is_warmup_done
                 and (
                     self.step_tracker.interactions_after_warmup % self.update_frequency
                     == 0
@@ -149,7 +149,7 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
             )
         # If update_frequency is <= 0, we update when an episode ends
         return (
-            self.step_tracker.warmup_is_done
+            self.step_tracker.is_warmup_done
             and (self.step_tracker.total_number_of_episodes > self._last_update_episode)
             and self.step_tracker.interactions_after_warmup > self._last_update_step
         )
@@ -229,7 +229,7 @@ class TargetNetUpdate(UpdatableComponent):
     def update_condition(self) -> bool:
         # True if warmup is done and the update frequency is met
         return (
-            self.step_tracker.warmup_is_done
+            self.step_tracker.is_warmup_done
             and self.step_tracker.interactions_after_warmup % self.update_frequency == 0
         )
 

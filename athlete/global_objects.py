@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 import torch
@@ -11,36 +11,64 @@ from athlete import constants
 # TODO include a functionality to externally register and increment counter in the step tracker
 # This way Updatable components that remember when they have been last updated don't need to
 # save this information themselves
+
+
 class StepTracker:
-    """The StepTracker holds the number of interactions, episodes and datapoints added to the replay buffer.
-    This information might be useful for updating conditions. This class can be used as a singleton.
-    """
+    """The StepTracker tracks information that is relevant for the update conditions of the updatable components."""
 
     FILE_SAVE_NAME = "step_tracker"
-
     _instance = None
 
-    # TODO remove this instance things and just handel everything directly via the singelton class
-
-    def __init__(self, warmup_steps: int = 0) -> None:
-        """Initializes a StepTracker instance. Registers default trackers for environment steps, episodes, and data points.
+    @classmethod
+    def get_instance(cls, warmup_steps: int = 0) -> "StepTracker":
+        """Returns the global instance of the StepTracker.
 
         Args:
-            warmup_steps (int): Number of warmup steps that an algorithm might perform, this affects the interactions_after_warmup property.
+            warmup_steps (int, optional): Number of warmup steps that an algorithm might perform.
+                This parameter is only used when creating the instance for the first time.
+
+        Returns:
+            StepTracker: The singleton instance
         """
+        if cls._instance is None:
+            raise Exception(
+                "StepTracker has not been initialized. Please call set_global_instance() first."
+            )
+        return cls._instance
+
+    @classmethod
+    def set_global_instance(cls, step_tracker: "StepTracker") -> None:
+        """Sets the global instance of the StepTracker.
+
+        Args:
+            step_tracker (StepTracker): The instance to set as the global instance.
+        """
+        cls._instance = step_tracker
+
+    def __init__(self, warmup_steps: int = 0) -> None:
+        """Initializes a StepTracker instance.
+
+        Args:
+            warmup_steps (int): Number of warmup steps that an algorithm might perform,
+                this affects the interactions_after_warmup property.
+        """
+        self.registered_trackers: dict[str, int] = {}
+        self.meta_data: dict[str, Any] = {}
+
         self.register_tracker(
             id=constants.TRACKER_ENVIRONMENT_INTERACTIONS, inital_value=0
         )
         self.register_tracker(id=constants.TRACKER_ENVIRONMENT_EPISODES, inital_value=0)
         self.register_tracker(id=constants.TRACKER_DATA_POINTS, inital_value=0)
-        self.warmup_steps = warmup_steps
-        self.registered_trackers = {}
+
+        self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS] = warmup_steps
 
     def register_tracker(self, id: str, inital_value: int = 0) -> str:
         """Registers a tracker with a unique ID. If the ID is already registered a number will be appended to the ID to make it unique.
 
         Args:
             id (str): Identifier for the tracker.
+            inital_value (int, optional): Initial value for the tracker. Defaults to 0.
 
         Returns:
             str: The ID that was finally used for the tracker, which might be different from the input ID if it was already registered.
@@ -113,11 +141,11 @@ class StepTracker:
         return max(
             0,
             self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
-            - self.warmup_steps,
+            - self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS],
         )
 
     @property
-    def warmup_is_done(self) -> bool:
+    def is_warmup_done(self) -> bool:
         """Checks if the warmup period is done.
 
         Returns:
@@ -125,17 +153,18 @@ class StepTracker:
         """
         return (
             self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
-            >= self.warmup_steps
+            >= self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS]
         )
 
-    # TODO continue here finish this
-
     def save_checkpoint(self, context: SaveContext) -> None:
+        """Saves the state of the step tracker to a checkpoint.
 
+        Args:
+            context (SaveContext): The context for saving the checkpoint.
+        """
         to_save = (
-            self.total_interactions,
-            self.total_number_of_episodes,
-            self.total_number_of_datapoints_added,
+            self.registered_trackers,
+            self.meta_data,
         )
         save_path = os.path.join(
             context.save_path, context.prefix + self.FILE_SAVE_NAME
@@ -144,15 +173,18 @@ class StepTracker:
         context.file_handler.save_to_file(to_save=to_save, save_path=save_path)
 
     def load_checkpoint(self, context: SaveContext) -> None:
+        """Loads the state of the step tracker from a checkpoint.
 
+        Args:
+            context (SaveContext): The context for loading the checkpoint.
+        """
         load_path = os.path.join(
             context.save_path, context.prefix + self.FILE_SAVE_NAME
         )
 
         (
-            self.total_interactions,
-            self.total_number_of_episodes,
-            self.total_number_of_datapoints_added,
+            self.registered_trackers,
+            self.meta_data,
         ) = context.file_handler.load_from_file(load_path=load_path)
 
 

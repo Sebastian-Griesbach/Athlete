@@ -168,12 +168,16 @@ class Agent(CompositeSaveableComponent):
             policy_info=self.last_policy_info,
         )
         # only increment environment interactions if the data of that action is received, such that we know it actually happened
-        self.step_tracker.increment_environment_interaction()
+        self.step_tracker.increment_tracker(
+            id=constants.TRACKER_ENVIRONMENT_INTERACTIONS
+        )
         if new_data_point_accumulated:
-            self.step_tracker.increment_datapoint()
+            self.step_tracker.increment_tracker(id=constants.TRACKER_DATA_POINTS)
         if terminated or truncated:
             # we need to increment this before the update as an update condition might depend on it.
-            self.step_tracker.increment_episode()
+            self.step_tracker.increment_tracker(
+                id=constants.TRACKER_ENVIRONMENT_EPISODES
+            )
 
         # Potentially perform an update, whether update is actually performed depends on the update conditions of the updatable components
         update_info = self.update_rule.update()
@@ -201,7 +205,7 @@ class Agent(CompositeSaveableComponent):
 
         update_info = {}
         if new_data_point_accumulated:
-            self.step_tracker.increment_datapoint()
+            self.step_tracker.increment_tracker(id=constants.TRACKER_DATA_POINTS)
             # TODO this shouldn't depend on whether a new data point was collected,
             # instead all update conditions should consider this information themselfs
             update_info = self.update_rule.update()
