@@ -1,8 +1,6 @@
 from typing import Any, Dict, Optional, Tuple
 
 
-# TODO remove data provider and add this functionality to the data collector,
-# pass the get data function to the updatable components that needs to access the data
 class UpdateDataProvider:
     """A communication channel between data collectors and update rules.
 
@@ -27,6 +25,8 @@ class UpdateDataProvider:
         self.update_data = initial_data
         self.metadata = initial_metadata
 
+        self.new_data_available = initial_data is not None
+
     def set_data(self, update_data: Any, metadata: Dict[str, Any] = {}) -> None:
         """Set new data in the provider.
 
@@ -36,6 +36,7 @@ class UpdateDataProvider:
         """
         self.update_data = update_data
         self.metadata = metadata
+        self.new_data_available = True
 
     def get_data(self) -> Tuple[Any, Dict[str, Any]]:
         """Get the current data and metadata from the provider.
@@ -43,4 +44,13 @@ class UpdateDataProvider:
         Returns:
             Tuple[Any, Dict[str, Any]]: The current data and metadata held in the provider.
         """
+        self.new_data_available = False
         return self.update_data, self.metadata
+
+    def has_new_data(self) -> bool:
+        """Check if there is new data available in the provider.
+
+        Returns:
+            bool: True if new data is available, False otherwise.
+        """
+        return self.new_data_available

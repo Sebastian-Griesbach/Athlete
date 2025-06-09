@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from athlete.saving.saveable_component import SaveContext
+from athlete import constants
 
 
 # TODO include a functionality to externally register and increment counter in the step tracker
@@ -19,63 +20,88 @@ class StepTracker:
 
     _instance = None
 
-    @classmethod
-    def get_instance(cls) -> "StepTracker":
-        """Returns the global instance of the StepTracker.
+    # TODO remove this instance things and just handel everything directly via the singelton class
 
-        Raises:
-            Exception: If the instance has not been initialized.
-
-        Returns:
-            StepTracker: The global instance of the StepTracker.
-        """
-        if cls._instance is None:
-            raise Exception("TrainingTracker has not been initialized.")
-        return cls._instance
-
-    @classmethod
-    def set_global_instance(cls, instance: "StepTracker") -> None:
-        """Sets the global instance of the StepTracker.
-
-        Args:
-            instance (StepTracker): The instance to set as the global instance.
-        """
-        cls._instance = instance
-
-    def __init__(self, warmup_steps: int) -> None:
-        """Initializes a StepTracker instance. Can be different from the global instance.
+    def __init__(self, warmup_steps: int = 0) -> None:
+        """Initializes a StepTracker instance. Registers default trackers for environment steps, episodes, and data points.
 
         Args:
             warmup_steps (int): Number of warmup steps that an algorithm might perform, this affects the interactions_after_warmup property.
         """
-        self.total_interactions = 0
-        self.total_number_of_datapoints_added = 0
-        self.total_number_of_episodes = 0
+        self.register_tracker(
+            id=constants.TRACKER_ENVIRONMENT_INTERACTIONS, inital_value=0
+        )
+        self.register_tracker(id=constants.TRACKER_ENVIRONMENT_EPISODES, inital_value=0)
+        self.register_tracker(id=constants.TRACKER_DATA_POINTS, inital_value=0)
         self.warmup_steps = warmup_steps
+        self.registered_trackers = {}
 
-    def increment_environment_interaction(self, num_interactions: int = 1) -> None:
-        """Increments the number of interactions with the environment.
-
-        Args:
-            num_interactions (int, optional): Number of interactions to add. Defaults to 1.
-        """
-        self.total_interactions += num_interactions
-
-    def increment_datapoint(self, num_datapoints: int = 1) -> None:
-        """Increments the number of collected datapoints, what exactly this means depends on the algorithm.
+    def register_tracker(self, id: str, inital_value: int = 0) -> str:
+        """Registers a tracker with a unique ID. If the ID is already registered a number will be appended to the ID to make it unique.
 
         Args:
-            num_datapoints (int, optional): Number of datapoints to add. Defaults to 1.
-        """
-        self.total_number_of_datapoints_added += num_datapoints
+            id (str): Identifier for the tracker.
 
-    def increment_episode(self, num_episodes: int = 1) -> None:
-        """Increments the number of episodes.
+        Returns:
+            str: The ID that was finally used for the tracker, which might be different from the input ID if it was already registered.
+        """
+        if id not in self.registered_trackers:
+            self.registered_trackers[id] = inital_value
+            return id
+
+        # If the ID is already registered, append a number to make it unique
+        i = 2
+        id_candidate = f"{id}_{i}"
+        while id_candidate in self.registered_trackers:
+            i += 1
+            id_candidate = f"{id}_{i}"
+
+        self.registered_trackers[id_candidate] = inital_value
+        return id_candidate
+
+    def increment_tracker(self, id: str, increment: int = 1) -> None:
+        """Increments the value of a registered tracker.
 
         Args:
-            num_episodes (int, optional): Number of episodes to add. Defaults to 1.
+            id (str): Identifier for the tracker.
+            increment (int, optional): Value to increment the tracker by. Defaults to 1.
+
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
         """
-        self.total_number_of_episodes += num_episodes
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        self.registered_trackers[id] += increment
+
+    def set_tracker_value(self, id: str, value: int) -> None:
+        """Sets the value of a registered tracker.
+
+        Args:
+            id (str): Identifier for the tracker.
+            value (int): Value to set for the tracker.
+
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
+        """
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        self.registered_trackers[id] = value
+
+    def get_tracker_value(self, id: str) -> int:
+        """Gets the value of a registered tracker.
+
+        Args:
+            id (str): Identifier for the tracker.
+
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
+
+        Returns:
+            int: Value of the tracker.
+        """
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        return self.registered_trackers[id]
 
     @property
     def interactions_after_warmup(self) -> int:
@@ -84,7 +110,11 @@ class StepTracker:
         Returns:
             int: Number of interactions after the warmup period.
         """
-        return max(0, self.total_interactions - self.warmup_steps)
+        return max(
+            0,
+            self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
+            - self.warmup_steps,
+        )
 
     @property
     def warmup_is_done(self) -> bool:
@@ -93,7 +123,12 @@ class StepTracker:
         Returns:
             bool: True if the warmup period is done, False otherwise.
         """
-        return self.total_interactions >= self.warmup_steps
+        return (
+            self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
+            >= self.warmup_steps
+        )
+
+    # TODO continue here finish this
 
     def save_checkpoint(self, context: SaveContext) -> None:
 

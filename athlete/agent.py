@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Tuple
 import os
 import datetime
+from warnings import warn
 
 from gymnasium.spaces import Space
 
@@ -388,7 +389,13 @@ class Agent(CompositeSaveableComponent):
         updated_configuration = algorithm.default_configuration.copy()
         updated_configuration.update(kwargs)
 
-        # TODO could add a check here if all keys of kwargs are in the default configuration
+        custom_configuration_keys = list(kwargs.keys())
+        for key in custom_configuration_keys:
+            if key not in updated_configuration.keys():
+                warn(
+                    f"Key {key} is not part of the default configuration of the algorithm {algorithm_id}. "
+                    "It's likely that this setting is not used by the algorithm and will be ignored.",
+                )
 
         # RNG Handler
         rng_handler = RNGHandler(seed)
