@@ -10,8 +10,6 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
 
     LOG_TAG_LOSS = "loss"
 
-    SAVE_HANDLING_STATS = "dqn_value_update_handling_stats"
-
     def __init__(
         self,
         q_value_function: torch.nn.Module,
@@ -25,7 +23,6 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
         discount: float = 0.99,
         criteria: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
         log_tag: str = LOG_TAG_LOSS,
-        save_file_name: str = SAVE_HANDLING_STATS,
         gradient_max_norm: float = None,
     ) -> None:
         """Initializes the DQN value update component.
@@ -45,13 +42,11 @@ class DQNValueUpdate(TorchFrequentGradientUpdate):
             discount (float, optional): Discount factor for the Q-value update. Defaults to 0.99.
             criteria (torch.nn.modules.loss._Loss, optional): Loss function to be used for the Q-value update. Defaults to torch.nn.MSELoss().
             log_tag (str, optional): Tag used for logging the loss. Defaults to 'loss'.
-            save_file_name (str, optional): File name for saving the handling stats. Defaults to 'dqn_value_update_handling_stats'.
             gradient_max_norm (float, optional): Maximum norm for gradient clipping. Defaults to None.
         """
         super().__init__(
             optimizer=optimizer,
             log_tag=log_tag,
-            save_file_name=save_file_name,
             update_frequency=update_frequency,
             number_of_updates=number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,

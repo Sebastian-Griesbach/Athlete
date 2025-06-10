@@ -147,9 +147,6 @@ class DQNUpdate(UpdateRule, CompositeSaveableComponent):
             update_frequency=value_net_update_frequency,
         )
 
-        # This is required because dqn value update might needs to know during which step it was last updated to calculated number of updates.
-        self.register_saveable_component("value_update", self.value_function_update)
-
         # Target Net Update
 
         self.target_net_update = TargetNetUpdate(

@@ -13,7 +13,6 @@ from athlete.update.update_rule import UpdatableComponent
 from athlete.function import numpy_to_tensor
 from athlete.algorithms.ppo.module import PPOActor
 from athlete.global_objects import StepTracker
-from athlete.saving.saveable_component import SaveContext
 
 
 class PPOBufferUpdate(UpdatableComponent):
@@ -35,7 +34,6 @@ class PPOBufferUpdate(UpdatableComponent):
         generalized_advantage_estimation_lambda: float,
         on_policy_buffer: OnPolicyBuffer,
         # TODO continue updating step tracker implementations (updateable components, and update rules, no more saving required)
-        save_file_name: str = SAVE_FILE_NAME,
     ) -> None:
         """Initializes the PPOBufferUpdate class.
 
@@ -45,7 +43,6 @@ class PPOBufferUpdate(UpdatableComponent):
             discount (float): The discount factor used to calculate the return.
             generalized_advantage_estimation_lambda (float): The lambda value used for generalized advantage estimation.
             on_policy_buffer (OnPolicyBuffer): The on-policy buffer used to store the data.
-            save_file_name (str, optional): The name of the file to save the handling stats. Defaults to "ppo_buffer_update".
         """
         super().__init__()
         self.update_data_provider = update_data_provider
@@ -62,8 +59,6 @@ class PPOBufferUpdate(UpdatableComponent):
         self._last_datapoint_updated_on_tracker_id = self.step_tracker.register_tracker(
             id="ppo_buffer_last_datapoint_updated_on"
         )
-
-        self.save_file_name = save_file_name
 
     def update(self):
         """Takes the data from the data collector and prepares it to be used by the PPO update.
@@ -126,6 +121,7 @@ class PPOBufferUpdate(UpdatableComponent):
 
         self.on_policy_buffer.set_data(data_dict=data)
 
+        # remember when the last update was done, used for update condition
         self.step_tracker.set_tracker_value(
             id=self._last_datapoint_updated_on_tracker_id,
             value=self.step_tracker.get_tracker_value(id=constants.TRACKER_DATA_POINTS),
@@ -145,7 +141,7 @@ class PPOBufferUpdate(UpdatableComponent):
         )
 
 
-# TODO continue updating the imlemenation of step tracker
+# TODO continue updating the implementation of step tracker
 
 
 class PPOGradientUpdate(UpdatableComponent):
@@ -182,7 +178,6 @@ class PPOGradientUpdate(UpdatableComponent):
         value_loss_log_tag: str = VALUE_LOSS_LOG_TAG,
         entropy_loss_log_tag: str = ENTROPY_LOSS_LOG_TAG,
         total_loss_log_tag: str = TOTAL_LOSS_LOG_TAG,
-        save_file_name: str = SAVE_FILE_NAME,
     ) -> None:
         """Initializes the PPO gradient updatable component.
 
@@ -201,7 +196,6 @@ class PPOGradientUpdate(UpdatableComponent):
             value_loss_log_tag (str, optional): The tag used for logging the value loss. Defaults to 'value_loss'.
             entropy_loss_log_tag (str, optional): The tag used for logging the entropy loss. Defaults to 'entropy_loss'.
             total_loss_log_tag (str, optional): The tag used for logging the total loss. Defaults to 'loss'.
-            save_file_name (str, optional): The name of the file to save the handling stats. Defaults to 'ppo_gradient_update'.
         """
         super().__init__()
         self.value_function = value_function
@@ -218,10 +212,8 @@ class PPOGradientUpdate(UpdatableComponent):
         self.batch_normalize_advantage = batch_normalize_advantage
 
         self.step_tracker = StepTracker.get_instance()
-        self._last_interaction_updated_on_tracker_id = (
-            self.step_tracker.register_tracker(
-                id="ppo_update_last_interaction_updated_on"
-            )
+        self._last_datapoint_updated_on_tracker_id = self.step_tracker.register_tracker(
+            id="ppo_update_last_datapoint_updated_on"
         )
 
         self.policy_loss_log_tag = policy_loss_log_tag
@@ -242,8 +234,6 @@ class PPOGradientUpdate(UpdatableComponent):
             )
         else:
             self.gradient_manipulation_function = lambda: None
-
-        self.save_file_name = save_file_name
 
     def update(self) -> None:
         """Performing the PPO update."""
@@ -280,10 +270,8 @@ class PPOGradientUpdate(UpdatableComponent):
             total_logging_info[key] = sum(value) / len(value)
 
         self.step_tracker.set_tracker_value(
-            id=self._last_interaction_updated_on_tracker_id,
-            value=self.step_tracker.get_tracker_value(
-                id=constants.TRACKER_ENVIRONMENT_INTERACTIONS
-            ),
+            id=self._last_datapoint_updated_on_tracker_id,
+            value=self.step_tracker.get_tracker_value(id=constants.TRACKER_DATA_POINTS),
         )
 
         return total_logging_info

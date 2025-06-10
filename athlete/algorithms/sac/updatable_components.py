@@ -11,8 +11,6 @@ class SACCriticUpdate(TorchFrequentGradientUpdate):
 
     CRITIC_LOSS_LOG_TAG = "critic_loss"
 
-    SAVE_HANDLING_STATS = "sac_value_update_handling_stats"
-
     def __init__(
         self,
         temperature: torch.nn.Parameter,
@@ -30,7 +28,6 @@ class SACCriticUpdate(TorchFrequentGradientUpdate):
         multiply_number_of_updates_by_environment_steps: bool = False,
         gradient_max_norm: float = None,
         log_tag: str = CRITIC_LOSS_LOG_TAG,
-        save_file_name: str = SAVE_HANDLING_STATS,
     ) -> None:
         """Initializes the SACCriticUpdate class.
 
@@ -50,12 +47,10 @@ class SACCriticUpdate(TorchFrequentGradientUpdate):
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the environment steps since the last update. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
             log_tag (str, optional): Log tag for the loss. Defaults to "critic_loss".
-            save_file_name (str, optional): File name for saving handling stats. Defaults to "sac_value_update_handling_stats".
         """
         super().__init__(
             optimizer=critic_optimizer,
             log_tag=log_tag,
-            save_file_name=save_file_name,
             update_frequency=update_frequency,
             number_of_updates=number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
@@ -122,8 +117,6 @@ class SACActorUpdate(TorchFrequentGradientUpdate):
 
     ACTOR_LOSS_LOG_TAG = "actor_loss"
 
-    SAVE_HANDLING_STATS = "sac_actor_update_handling_stats"
-
     def __init__(
         self,
         actor: SACActor,
@@ -137,7 +130,6 @@ class SACActorUpdate(TorchFrequentGradientUpdate):
         multiply_number_of_updates_by_environment_steps: bool = False,
         gradient_max_norm: float = None,
         log_tag: str = ACTOR_LOSS_LOG_TAG,
-        save_file_name: str = SAVE_HANDLING_STATS,
     ) -> None:
         """Initializes the SAC actor update class.
 
@@ -154,12 +146,10 @@ class SACActorUpdate(TorchFrequentGradientUpdate):
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the environment steps since the last update. Defaults to False.
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
             log_tag (str, optional): Log tag for the loss. Defaults to "actor_loss".
-            save_file_name (str, optional): File name for saving handling stats. Defaults to "sac_actor_update_handling_stats".
         """
         super().__init__(
             optimizer=actor_optimizer,
             log_tag=log_tag,
-            save_file_name=save_file_name,
             update_frequency=update_frequency,
             number_of_updates=number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
@@ -200,8 +190,6 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
     TEMPERATURE_LOSS_LOG_TAG = "temperature_loss"
     TEMPERATURE_LOG_TAG = "temperature"
 
-    SAVE_HANDLING_STATS = "sac_temperature_update_handling_stats"
-
     def __init__(
         self,
         target_entropy: float,
@@ -216,7 +204,6 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
         gradient_max_norm: float = None,
         temperature_log_tag: str = TEMPERATURE_LOG_TAG,
         loss_log_tag: str = TEMPERATURE_LOSS_LOG_TAG,
-        save_file_name: str = SAVE_HANDLING_STATS,
     ) -> None:
         """Initializes the SAC temperature update class.
 
@@ -233,12 +220,10 @@ class SACTemperatureUpdate(TorchFrequentGradientUpdate):
             gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is applied. Defaults to None.
             temperature_log_tag (str, optional): Log tag used for the log temperature loss. Defaults to "temperature_loss".
             loss_log_tag (str, optional): Log tag used to log the current temperature. Defaults to "temperature".
-            save_file_name (str, optional): File name for saving handling stats. Defaults to "sac_temperature_update_handling_stats".
         """
         super().__init__(
             optimizer=temperature_optimizer,
             log_tag=loss_log_tag,
-            save_file_name=save_file_name,
             update_frequency=update_frequency,
             number_of_updates=number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,

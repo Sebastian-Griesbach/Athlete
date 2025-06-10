@@ -205,8 +205,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             gradient_max_norm=critic_gradient_max_norm,
         )
 
-        self.register_saveable_component("critic_update", self.critic_update)
-
         # Actor Update
         actor_data_keys = [constants.DATA_OBSERVATIONS]
         actor_data_sampler_function = lambda: extract_data_from_batch(
@@ -229,8 +227,6 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
             log_tag=DDPGActorUpdate.ACTOR_LOSS_LOG_TAG,
             gradient_max_norm=actor_gradient_max_norm,
         )
-
-        self.register_saveable_component("actor_update", self.actor_update)
 
         # Target Critic Update
         self.target_critic_1_update = TargetNetUpdate(

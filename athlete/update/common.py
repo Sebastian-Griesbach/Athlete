@@ -1,6 +1,5 @@
 from typing import Dict, Any, Optional
 from abc import abstractmethod
-import os
 
 import torch
 from torch.optim import Optimizer
@@ -10,7 +9,7 @@ from athlete.update.update_rule import UpdatableComponent
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import Buffer
 from athlete.global_objects import StepTracker
-from athlete.saving.saveable_component import SaveContext
+from athlete import constants
 
 
 class TorchFrequentGradientUpdate(UpdatableComponent):
@@ -26,7 +25,6 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         self,
         optimizer: Optimizer,
         log_tag: str,
-        save_file_name: str,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -37,7 +35,6 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         Args:
             optimizer (Optimizer): The optimizer to be used for the update.
             log_tag (str): The tag used for logging the resulting loss
-            save_file_name (str): The name of the file to save the state of the component to.
             update_frequency (int, optional): The frequency of the update according to the number of environment interactions.
             If the update frequency is -1, updates will only be performed at the end of an episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to be performed when the update condition is met. Defaults to 1.
@@ -49,7 +46,6 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         self.optimizer = optimizer
         self.update_frequency = update_frequency
         self.log_tag = log_tag
-        self.save_file_name = save_file_name
         self.number_of_updates = number_of_updates
         self.multiply_number_of_updates_by_environment_steps = (
             multiply_number_of_updates_by_environment_steps
@@ -70,9 +66,14 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
             self.gradient_manipulation_function = lambda: None
 
         self.step_tracker = StepTracker.get_instance()
-
-        self._last_update_step = 0
-        self._last_update_episode = 0
+        self._last_interaction_updated_on_tracker_id = (
+            self.step_tracker.register_tracker(
+                id="frequent_update_last_interaction_updated_on_tracker_id"
+            )
+        )
+        self._last_episode_updated_on_tracker_id = self.step_tracker.register_tracker(
+            id="frequent_update_last_episode_updated_on_tracker_id"
+        )
 
     def update(self) -> Dict[str, Any]:
         """Performing a loss driven update with a torch optimizer following the defined loss function.
@@ -88,8 +89,19 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
             else self.number_of_updates
             * (self.step_tracker.interactions_after_warmup - self._last_update_step)
         )
-        self._last_update_step = self.step_tracker.interactions_after_warmup
-        self._last_update_episode = self.step_tracker.total_number_of_episodes
+
+        # Tracking the last update step and episode for update condition and number of updates
+        self.step_tracker.set_tracker_value(
+            id=self._last_interaction_updated_on_tracker_id,
+            value=self.step_tracker.interactions_after_warmup,
+        )
+        self.step_tracker.set_tracker_value(
+            id=self._last_episode_updated_on_tracker_id,
+            value=self.step_tracker.get_tracker_value(
+                id=constants.TRACKER_ENVIRONMENT_EPISODES
+            ),
+        )
+
         for _ in range(number_of_updates):
 
             loss = self.calculate_loss()
@@ -143,32 +155,28 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
                     not self.multiply_number_of_updates_by_environment_steps
                     or (
                         self.step_tracker.interactions_after_warmup
-                        > self._last_update_step
+                        > self.step_tracker.get_tracker_value(
+                            self._last_interaction_updated_on_tracker_id
+                        )
                     )
                 )
             )
         # If update_frequency is <= 0, we update when an episode ends
         return (
             self.step_tracker.is_warmup_done
-            and (self.step_tracker.total_number_of_episodes > self._last_update_episode)
-            and self.step_tracker.interactions_after_warmup > self._last_update_step
+            and (
+                self.step_tracker.get_tracker_value(
+                    id=constants.TRACKER_ENVIRONMENT_EPISODES
+                )
+                > self.step_tracker.get_tracker_value(
+                    id=self._last_episode_updated_on_tracker_id
+                )
+            )
+            and self.step_tracker.interactions_after_warmup
+            > self.step_tracker.get_tracker_value(
+                id=self._last_interaction_updated_on_tracker_id
+            )
         )
-
-    def save_checkpoint(self, context: SaveContext):
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = (self._last_update_step, self._last_update_episode)
-
-        context.file_handler.save_to_file(to_save=handling_stats, save_path=save_path)
-
-    def load_checkpoint(self, context: SaveContext):
-        save_path = os.path.join(
-            context.save_path, context.prefix + self.save_file_name
-        )
-        handling_stats = context.file_handler.load_from_file(load_path=save_path)
-
-        self._last_update_step, self._last_update_episode = handling_stats
 
 
 class TargetNetUpdate(UpdatableComponent):
@@ -200,17 +208,26 @@ class TargetNetUpdate(UpdatableComponent):
         self.source_net = source_net
         self.target_net = target_net
         self.step_tracker = StepTracker.get_instance()
+        self._last_interaction_updated_on_tracker_id = (
+            self.step_tracker.register_tracker(
+                id="target_net_last_interaction_updated_on_tracker_id"
+            )
+        )
         self.tau = tau
         self.update_frequency = update_frequency
-        if tau == None or tau == 1.0:
-            self.update = self._hard_update
-        else:
-            self.update = self._soft_update
 
     def update(self) -> Dict[str, Any]:
-        raise NotImplementedError(
-            "This method should be monkey patched in the initialization of the class."
+        if self.tau == None or self.tau == 1.0:
+            log_info = self._hard_update()
+        else:
+            log_info = self._soft_update()
+
+        self.step_tracker.set_tracker_value(
+            id=self._last_interaction_updated_on_tracker_id,
+            value=self.step_tracker.interactions_after_warmup,
         )
+
+        return log_info
 
     def _soft_update(self) -> Dict[str, Any]:
         for target_param, param in zip(
@@ -227,10 +244,14 @@ class TargetNetUpdate(UpdatableComponent):
 
     @property
     def update_condition(self) -> bool:
-        # True if warmup is done and the update frequency is met
+        # True if warmup is done and the update frequency is met, and we did not update the target network yet
         return (
             self.step_tracker.is_warmup_done
             and self.step_tracker.interactions_after_warmup % self.update_frequency == 0
+            and self.step_tracker.interactions_after_warmup
+            > self.step_tracker.get_tracker_value(
+                id=self._last_interaction_updated_on_tracker_id
+            )
         )
 
 
@@ -239,7 +260,6 @@ class ReplayBufferUpdate(UpdatableComponent):
 
     This class serves as the bridge between data collection and the replay buffer,
     checking for new data from the UpdateDataProvider and adding it to the buffer.
-    It automatically tracks which datapoints have been processed to avoid duplicates.
     """
 
     def __init__(
@@ -259,7 +279,9 @@ class ReplayBufferUpdate(UpdatableComponent):
         self.update_data_provider = update_data_provider
         self.replay_buffer = replay_buffer
         self.step_tracker = StepTracker.get_instance()
-        self.datapoints_added = 0
+        self._last_datapoint_updated_on_tracker_id = self.step_tracker.register_tracker(
+            id="replay_buffer_last_datapoint_updated_on_tracker_id"
+        )
 
     def update(self) -> Dict[str, Any]:
         """Adds data from the update data provider to the replay buffer.
@@ -270,11 +292,19 @@ class ReplayBufferUpdate(UpdatableComponent):
 
         replay_data, metadata = self.update_data_provider.get_data()
         self.replay_buffer.add(data_dictionary=replay_data, metadata=metadata)
+
+        self.step_tracker.set_tracker_value(
+            id=self._last_datapoint_updated_on_tracker_id,
+            value=self.step_tracker.get_tracker_value(id=constants.TRACKER_DATA_POINTS),
+        )
+
         return {}
 
     @property
     def update_condition(self) -> bool:
         """True if there is a new datapoint since the last update."""
-        return (
-            self.step_tracker.total_number_of_datapoints_added > self.datapoints_added
+        return self.step_tracker.get_tracker_value(
+            id=constants.TRACKER_DATA_POINTS
+        ) > self.step_tracker.get_tracker_value(
+            id=self._last_datapoint_updated_on_tracker_id
         )

@@ -235,7 +235,6 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
             gradient_max_norm=critic_gradient_max_norm,
             log_tag=SACCriticUpdate.CRITIC_LOSS_LOG_TAG,
-            save_file_name=SACCriticUpdate.SAVE_HANDLING_STATS,
         )
 
         # Actor Update
@@ -258,7 +257,6 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
             gradient_max_norm=actor_gradient_max_norm,
             log_tag=SACActorUpdate.ACTOR_LOSS_LOG_TAG,
-            save_file_name=SACActorUpdate.SAVE_HANDLING_STATS,
         )
 
         if self.automatic_temperature_update:
@@ -276,7 +274,6 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
                 gradient_max_norm=None,
                 temperature_log_tag=SACTemperatureUpdate.TEMPERATURE_LOG_TAG,
                 loss_log_tag=SACTemperatureUpdate.TEMPERATURE_LOSS_LOG_TAG,
-                save_file_name=SACTemperatureUpdate.SAVE_HANDLING_STATS,
             )
 
         # Target Critic Update

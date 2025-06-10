@@ -12,8 +12,6 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
 
     CRITIC_LOSS_LOG_TAG = "critic_loss"
 
-    SAVE_HANDLING_STATS = "td3_value_update_handling_stats"
-
     def __init__(
         self,
         data_sampler: Callable[[None], Dict[str, torch.tensor]],
@@ -31,7 +29,6 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
         multiply_number_of_updates_by_environment_steps: bool = False,
         criteria: torch.nn.modules.loss._Loss = torch.nn.MSELoss(),
         log_tag: str = CRITIC_LOSS_LOG_TAG,
-        save_file_name: str = SAVE_HANDLING_STATS,
         gradient_max_norm: Optional[float] = None,
     ) -> None:
         """Initializes the TD3 critic update.
@@ -52,13 +49,11 @@ class TD3CriticUpdate(TorchFrequentGradientUpdate):
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
             criteria (torch.nn.modules.loss._Loss, optional): The loss function used for calculating the loss between the critic predictions and the target values. Defaults to torch.nn.MSELoss().
             log_tag (str, optional): The log tag to use for logging the loss. Defaults to "critic_loss".
-            save_file_name (str, optional): The file name to use for saving the handling stats. Defaults to "td3_value_update_handling_stats".
             gradient_max_norm (Optional[float], optional): The maximum norm for gradient clipping. If None, no clipping is performed. Defaults to None.
         """
         super().__init__(
             optimizer=critic_optimizer,
             log_tag=log_tag,
-            save_file_name=save_file_name,
             update_frequency=update_frequency,
             number_of_updates=number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,

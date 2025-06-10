@@ -7,10 +7,7 @@ import torch
 from athlete.saving.saveable_component import SaveContext
 from athlete import constants
 
-
-# TODO include a functionality to externally register and increment counter in the step tracker
-# This way Updatable components that remember when they have been last updated don't need to
-# save this information themselves
+# TODO test algorithm with updated StepTracker implementation
 
 
 class StepTracker:
@@ -20,12 +17,8 @@ class StepTracker:
     _instance = None
 
     @classmethod
-    def get_instance(cls, warmup_steps: int = 0) -> "StepTracker":
+    def get_instance(cls) -> "StepTracker":
         """Returns the global instance of the StepTracker.
-
-        Args:
-            warmup_steps (int, optional): Number of warmup steps that an algorithm might perform.
-                This parameter is only used when creating the instance for the first time.
 
         Returns:
             StepTracker: The singleton instance
