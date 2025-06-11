@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rl-athlete"
-version = "0.1.2"
+version = "0.2.0"
 description = "An API for reinforcement learning agents."
 readme = "README.md"
 authors = [
