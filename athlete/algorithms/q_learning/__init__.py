@@ -7,8 +7,11 @@ from athlete.data_collection.collector import DataCollector
 from athlete.data_collection.transition import GymnasiumTransitionDataCollector
 from athlete.update.update_rule import UpdateRule
 from athlete.algorithms.q_learning.update import QLearningUpdate
-from athlete.policy.policy_builder import PolicyBuilder
-from athlete.algorithms.q_learning.policy import QLearningPolicyBuilder
+from athlete.policy.policy import Policy
+from athlete.algorithms.q_learning.policy import (
+    QLearningTrainingPolicy,
+    QLearningEvaluationPolicy,
+)
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete import constants
 
@@ -32,7 +35,7 @@ DEFAULT_CONFIGURATION = {
 
 def make_q_learning_components(
     observation_space: Space, action_space: Space, configuration: Dict[str, Any]
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
     """Creates the components for a Q-learning agent.
 
     Args:
@@ -41,7 +44,7 @@ def make_q_learning_components(
         configuration: Algorithm configuration dictionary
 
     Returns:
-        Tuple containing data collector, update rule and policy builder
+        Tuple containing data collector, update rule, training policy, and evaluation policy.
 
     Raises:
         ValueError: If observation_space or action_space is not Discrete
@@ -73,9 +76,9 @@ def make_q_learning_components(
         learning_rate=configuration[ARGUMENT_LEARNING_RATE],
     )
 
-    # POLICY BUILDER
+    # POLICY
 
-    policy_builder = QLearningPolicyBuilder(
+    training_policy = QLearningTrainingPolicy(
         q_table=update_rule.q_table,
         action_space=action_space,
         start_epsilon=configuration[ARGUMENT_START_EPSILON],
@@ -83,7 +86,11 @@ def make_q_learning_components(
         epsilon_decay_steps=configuration[ARGUMENT_EPSILON_DECAY_STEPS],
     )
 
-    return data_collector, update_rule, policy_builder
+    evaluation_policy = QLearningEvaluationPolicy(
+        q_table=update_rule.q_table,
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

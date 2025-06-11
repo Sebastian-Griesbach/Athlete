@@ -5,7 +5,7 @@ import torch
 from gymnasium.spaces import Discrete
 
 from athlete.global_objects import StepTracker, RNGHandler
-from athlete.policy.policy_builder import Policy, PolicyBuilder
+from athlete.policy.policy import Policy
 
 
 class QLearningTrainingPolicy(Policy):
@@ -87,7 +87,7 @@ class QLearningTrainingPolicy(Policy):
             Tuple[int, Dict[str, Any]]: The chosen action and a dictionary with additional information: the current epsilon value and whether the action was chosen greedily.
         """
 
-        if not self.step_tracker.warmup_is_done:
+        if not self.step_tracker.is_warmup_done:
             return self._get_random_action(), {
                 "greedy": False,
                 "epsilon": self.start_epsilon,
@@ -145,67 +145,3 @@ class QLearningEvaluationPolicy(Policy):
         else:
             action = self.random_number_generator.choice(max_actions)
         return action, {}
-
-
-class QLearningPolicyBuilder(PolicyBuilder):
-    """Policy builder for Q-Learning.
-    This class is responsible for creating the training and evaluation policies for Q-Learning.
-    """
-
-    def __init__(
-        self,
-        q_table: np.ndarray,
-        action_space: Discrete,
-        start_epsilon: float,
-        end_epsilon: float,
-        epsilon_decay_steps: int,
-    ) -> None:
-        """Initializes the Q-Learning policy builder handing it all dependencies to build the training and evaluation policies.
-
-        Args:
-            q_table (np.ndarray): The Q-table to use for action selection.
-            action_space (Discrete): The action space of the environment.
-            start_epsilon (float): Starting value of epsilon for the decaying epsilon-greedy strategy.
-            end_epsilon (float): Minimum value of epsilon for the decaying epsilon-greedy strategy.
-            epsilon_decay_steps (int): The number of steps over which epsilon decays linearly from start_epsilon to end_epsilon.
-        """
-        super().__init__()
-        self.q_table = q_table
-        self.action_space = action_space
-        self.epsilon = start_epsilon
-        self.end_epsilon = end_epsilon
-        self.epsilon_decay_steps = epsilon_decay_steps
-
-    def build_training_policy(self) -> Policy:
-        """Builds the training policy for Q-Learning.
-
-        Returns:
-            Policy: The Q-Learning training policy.
-        """
-        return QLearningTrainingPolicy(
-            q_table=self.q_table,
-            action_space=self.action_space,
-            start_epsilon=self.epsilon,
-            end_epsilon=self.end_epsilon,
-            epsilon_decay_steps=self.epsilon_decay_steps,
-        )
-
-    def build_evaluation_policy(self) -> Policy:
-        """Builds the evaluation policy for Q-Learning.
-
-        Returns:
-            Policy: The Q-Learning evaluation policy.
-        """
-        return QLearningEvaluationPolicy(
-            q_table=self.q_table,
-        )
-
-    @property
-    def requires_rebuild_on_policy_change(self) -> bool:
-        """Whether the policy builder requires a rebuild when the policy changes.
-
-        Returns:
-            bool: False, as the update only changes entries in the Q-table which is
-            referenced by the policy classes.
-        """
-        return False

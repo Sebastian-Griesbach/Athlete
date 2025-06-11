@@ -5,7 +5,7 @@ from gymnasium.spaces import Box
 
 from athlete.function import numpy_to_tensor, tensor_to_numpy
 from athlete.global_objects import StepTracker, RNGHandler
-from athlete.policy.policy_builder import Policy, PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.policy.noise import NoiseProcess
 
 INFO_KEY_UNSCALED_ACTION = "unscaled_action"
@@ -76,7 +76,7 @@ class DDPGTrainingPolicy(Policy):
                 the unscaled action.
         """
 
-        if not self.step_tracker.warmup_is_done:
+        if not self.step_tracker.is_warmup_done:
             random_action = self.random_number_generator.random(
                 size=self.action_space.shape
             )
@@ -152,66 +152,3 @@ class DDPGEvaluationPolicy(Policy):
         action = tensor_to_numpy(action).squeeze()
         scaled_action = action * self.action_scales + self.action_offsets
         return scaled_action, {INFO_KEY_UNSCALED_ACTION: action}
-
-
-class DDPGPolicyBuilder(PolicyBuilder):
-    """A class to build the DDPG policies.
-    It builds the training and evaluation policies for DDPG.
-    """
-
-    def __init__(
-        self,
-        noise_process: NoiseProcess,
-        actor: torch.nn.Module,
-        action_space: Box,
-        post_replay_buffer_preprocessing: Optional[Callable[[Any], Any]],
-    ) -> None:
-        """Initialize the DDPG policy builder.
-
-        Args:
-            noise_process (NoiseProcess): Noise process to use for exploration of the training policy.
-            actor (torch.nn.Module): Actor network to use for action selection.
-            action_space (Box): Action space of the actor.
-            post_replay_buffer_preprocessing (Optional[Callable[[Any], Any]]):
-                A function to preprocess the observation before passing it to the actor.
-        """
-        super().__init__()
-        self.actor = actor
-        self.noise_process = noise_process
-        self.action_space = action_space
-        self.post_replay_buffer_preprocessing = post_replay_buffer_preprocessing
-
-    def build_training_policy(self) -> Policy:
-        """Build the training policy for DDPG.
-
-        Returns:
-            Policy: The training policy for DDPG.
-        """
-        return DDPGTrainingPolicy(
-            noise_process=self.noise_process,
-            actor=self.actor,
-            action_space=self.action_space,
-            post_replay_buffer_preprocessing=self.post_replay_buffer_preprocessing,
-        )
-
-    def build_evaluation_policy(self) -> Policy:
-        """Build the evaluation policy for DDPG.
-
-        Returns:
-            Policy: The evaluation policy for DDPG.
-        """
-        return DDPGEvaluationPolicy(
-            actor=self.actor,
-            action_space=self.action_space,
-            post_replay_buffer_preprocessing=self.post_replay_buffer_preprocessing,
-        )
-
-    @property
-    def requires_rebuild_on_policy_change(self) -> bool:
-        """Whether the policy needs to be rebuilt when the policy changes.
-
-        Returns:
-            bool: False, as the policy only changes the weights of the actor network during training
-            which are referenced in the policy class.
-        """
-        return False

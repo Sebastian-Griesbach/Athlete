@@ -4,7 +4,7 @@ import torch
 from gymnasium.spaces import Box
 
 from athlete.function import numpy_to_tensor, tensor_to_numpy
-from athlete.policy.policy_builder import Policy, PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.algorithms.ppo.module import PPOActor
 
 INFO_KEY_LOG_PROB = "log_prob"
@@ -94,56 +94,3 @@ class PPOEvaluationPolicy(Policy):
         action = tensor_to_numpy(action).squeeze(axis=0)
 
         return action, {}
-
-
-class PPOPolicyBuilder(PolicyBuilder):
-    """Policy builder for PPO.
-    This class is responsible for creating the training and evaluation policies for PPO.
-    """
-
-    def __init__(
-        self,
-        actor: PPOActor,
-        action_space: Box,
-    ) -> None:
-        """Initializes the PPO policy builder.
-
-        Args:
-            actor (PPOActor): The PPO actor to use for action selection.
-            action_space (Box): The action space of the actor.
-        """
-        super().__init__()
-        self.actor = actor
-        self.action_space = action_space
-
-    def build_training_policy(self) -> Policy:
-        """Builds the training policy for PPO.
-
-        Returns:
-            Policy: The PPO training policy.
-        """
-        return PPOTrainingPolicy(
-            actor=self.actor,
-            action_space=self.action_space,
-        )
-
-    def build_evaluation_policy(self) -> Policy:
-        """Builds the evaluation policy for PPO.
-
-        Returns:
-            Policy: The PPO evaluation policy.
-        """
-        return PPOEvaluationPolicy(
-            actor=self.actor,
-            action_space=self.action_space,
-        )
-
-    @property
-    def requires_rebuild_on_policy_change(self) -> bool:
-        """Whether the policy requires a rebuild on policy change.
-
-        Returns:
-            bool: False, as the update only changes the weights of the actor which are
-            referenced by the policy classes.
-        """
-        return False

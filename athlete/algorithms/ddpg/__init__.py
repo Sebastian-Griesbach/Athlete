@@ -10,10 +10,14 @@ from athlete.data_collection.transition import (
 )
 from athlete.update.update_rule import UpdateRule
 from athlete.algorithms.ddpg.update import DDPGUpdate
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.module.torch.common import FCContinuousQValueFunction, FCDeterministicActor
-from athlete.algorithms.ddpg.policy import INFO_KEY_UNSCALED_ACTION, DDPGPolicyBuilder
+from athlete.algorithms.ddpg.policy import (
+    INFO_KEY_UNSCALED_ACTION,
+    DDPGTrainingPolicy,
+    DDPGEvaluationPolicy,
+)
 from athlete.policy.noise import GaussianNoise
 from athlete import constants
 
@@ -100,7 +104,7 @@ DEFAULT_CONFIGURATION = {
 
 def make_ddpg_components(
     observation_space: Space, action_space: Space, configuration: Dict[str, Any]
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
     """Creates the components for a DDPG agent.
 
     Args:
@@ -109,7 +113,7 @@ def make_ddpg_components(
         configuration: Algorithm configuration dictionary
 
     Returns:
-        Tuple containing data collector, update rule and policy builder
+        Tuple containing data collector, update rule, training policy, and evaluation policy
 
     Raises:
         ValueError: If observation_space or action_space is not Box
@@ -193,7 +197,7 @@ def make_ddpg_components(
         ],
     )
 
-    # POLICY BUILDER
+    # POLICY
     configuration[ARGUMENT_NOISE_PROCESS_ARGUMENTS].update(
         {"shape": action_space.shape}
     )
@@ -202,7 +206,7 @@ def make_ddpg_components(
         **configuration[ARGUMENT_NOISE_PROCESS_ARGUMENTS]
     )
 
-    policy_builder = DDPGPolicyBuilder(
+    training_policy = DDPGTrainingPolicy(
         noise_process=noise_process,
         actor=actor,
         action_space=action_space,
@@ -211,7 +215,15 @@ def make_ddpg_components(
         ],
     )
 
-    return data_collector, update_rule, policy_builder
+    evaluation_policy = DDPGEvaluationPolicy(
+        actor=actor,
+        action_space=action_space,
+        post_replay_buffer_preprocessing=configuration[
+            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
+        ],
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

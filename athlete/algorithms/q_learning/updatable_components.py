@@ -18,7 +18,6 @@ class QTableUpdate(UpdatableComponent):
         q_table: np.ndarray,
         learning_rate: float,
         discount: float,
-        changes_policy: bool = True,
         loss_log_tag: str = LOG_TAG_LOSS,
     ) -> None:
         """Initializes the Q table update component.
@@ -28,11 +27,9 @@ class QTableUpdate(UpdatableComponent):
             q_table (np.ndarray): The Q table to be updated.
             learning_rate (float): The learning rate for the Q table update.
             discount (float): The discount factor for the Q table update.
-            changes_policy (bool, optional): Whether the policy changes immediately when performing this update.
-                For regular Q-learning this is true. Defaults to True.
             loss_log_tag (str, optional): The tag used for logging the loss. Defaults to 'loss'.
         """
-        super().__init__(changes_policy=changes_policy)
+        super().__init__()
 
         self.update_data_provider = update_data_provider
         self.q_table = q_table
@@ -40,7 +37,11 @@ class QTableUpdate(UpdatableComponent):
         self.discount = discount
         self.loss_log_tag = loss_log_tag
         self.step_tracker = StepTracker.get_instance()
-        self._last_update_step = 0
+        self._last_updated_on_interaction_tracker_id = (
+            self.step_tracker.register_tracker(
+                id="q_table_last_interaction_updated_on",
+            )
+        )
 
     def update(self) -> Union[None, Dict[str, Any]]:
         """Performs the Q table update.
@@ -62,15 +63,28 @@ class QTableUpdate(UpdatableComponent):
         q_value = self.q_table[state, action]
         next_q_value = np.max(self.q_table[next_state])
         target = reward + (1 - terminated) * self.discount * next_q_value
-        self.q_table[state, action] += self.learning_rate * (target - q_value)
+        delta = target - q_value
+        self.q_table[state, action] += self.learning_rate * delta
 
-        return {self.loss_log_tag: np.abs(target - q_value).item()}
+        # Track update step for update condition
+        self.step_tracker.set_tracker_value(
+            id=self._last_updated_on_interaction_tracker_id,
+            value=self.step_tracker.interactions_after_warmup,
+        )
+
+        return {self.loss_log_tag: np.abs(delta).item()}
 
     @property
     def update_condition(self) -> bool:
         """Whether this update should be performed.
 
         Returns:
-            bool: True if the warmup is done.
+            bool: True if the warmup is done and no update was performed in this interaction yet
         """
-        return self.step_tracker.warmup_is_done
+        return (
+            self.step_tracker.is_warmup_done
+            and self.step_tracker.interactions_after_warmup
+            > self.step_tracker.get_tracker_value(
+                id=self._last_updated_on_interaction_tracker_id,
+            )
+        )

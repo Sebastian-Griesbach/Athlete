@@ -1,13 +1,14 @@
 from typing import Any, Dict, Optional, Tuple
 import os
 import datetime
+from warnings import warn
 
 from gymnasium.spaces import Space
 
 from athlete.data_collection.collector import DataCollector
 from athlete.update.update_rule import UpdateRule
 from athlete.global_objects import StepTracker, RNGHandler
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete.saving.saveable_component import CompositeSaveableComponent, SaveContext
 from athlete.saving.file_handler import FileHandler, TorchFileHandler
 from athlete import constants
@@ -35,7 +36,8 @@ class Agent(CompositeSaveableComponent):
         self,
         data_collector: DataCollector,
         update_rule: UpdateRule,
-        policy_builder: PolicyBuilder,
+        training_policy: Policy,
+        evaluation_policy: Policy,
         save_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Initializes the agent by providing the major components.
@@ -61,14 +63,13 @@ class Agent(CompositeSaveableComponent):
         self.data_collector = data_collector
         self.register_saveable_component("data_collector", self.data_collector)
 
-        self.policy_builder = policy_builder
+        self.training_policy = training_policy
+        self.evaluation_policy = evaluation_policy
 
         self.save_metadata = save_metadata
 
         # Start in training mode
         self.train()
-        self.training_policy = self.policy_builder.build_training_policy()
-        self.evaluation_policy = self.policy_builder.build_evaluation_policy()
 
         self.last_action = None
         self.last_policy_info = {}
@@ -80,11 +81,9 @@ class Agent(CompositeSaveableComponent):
 
     def eval(self) -> None:
         """Puts the agent into evaluation mode. In this mode, the agent will not perform updates or collect data, It will simply
-        return actions according to its current evaluation policy.
+        return actions according to its evaluation policy.
         """
         self._training_mode = False
-        if self.policy_builder.requires_rebuild_on_policy_change:
-            self.evaluation_policy = self.policy_builder.build_evaluation_policy()
 
     def step(
         self,
@@ -126,7 +125,7 @@ class Agent(CompositeSaveableComponent):
                 truncated=truncated,
                 environment_info=env_info,
             )
-        return self._eval_step(observation=observation)
+        return self.evaluation_policy.act(observation=observation)
 
     def reset_step(
         self, observation: Any, info: Dict[str, Any] = {}
@@ -146,7 +145,7 @@ class Agent(CompositeSaveableComponent):
             return self._reset_train_step(
                 observation=observation, environment_info=info
             )
-        return self._reset_eval_step(observation=observation)
+        return self.evaluation_policy.reset_act(observation=observation)
 
     def _train_step(
         self,
@@ -169,15 +168,19 @@ class Agent(CompositeSaveableComponent):
             policy_info=self.last_policy_info,
         )
         # only increment environment interactions if the data of that action is received, such that we know it actually happened
-        self.step_tracker.increment_environment_interaction()
+        self.step_tracker.increment_tracker(
+            id=constants.TRACKER_ENVIRONMENT_INTERACTIONS
+        )
         if new_data_point_accumulated:
-            self.step_tracker.increment_datapoint()
+            self.step_tracker.increment_tracker(id=constants.TRACKER_DATA_POINTS)
         if terminated or truncated:
             # we need to increment this before the update as an update condition might depend on it.
-            self.step_tracker.increment_episode()
+            self.step_tracker.increment_tracker(
+                id=constants.TRACKER_ENVIRONMENT_EPISODES
+            )
 
         # Potentially perform an update, whether update is actually performed depends on the update conditions of the updatable components
-        update_info = self._update()
+        update_info = self.update_rule.update()
 
         # Only return an action if the episode has not ended
         if not (terminated or truncated):
@@ -202,35 +205,14 @@ class Agent(CompositeSaveableComponent):
 
         update_info = {}
         if new_data_point_accumulated:
-            update_info = self._update()
+            self.step_tracker.increment_tracker(id=constants.TRACKER_DATA_POINTS)
+
+        update_info = self.update_rule.update()
 
         self.last_action, self.last_policy_info = self.training_policy.reset_act(
             observation=observation
         )
         return self.last_action, update_info
-
-    def _eval_step(self, observation: Any) -> Tuple[Any, Dict[str, Any]]:
-        """Performs the step of the agent in evaluation mode."""
-        return self.evaluation_policy.act(observation=observation)
-
-    def _reset_eval_step(self, observation: Any) -> Tuple[Any, Dict[str, Any]]:
-        """Performs the reset step of the agent in evaluation mode."""
-        return self.evaluation_policy.reset_act(observation=observation)
-
-    def _update(self) -> Dict[str, float]:
-        """Performs the update of the agent. This is called after each step in training mode.
-        This does not mean that an actual update happens after every step. When a update is performed depends on the
-        update conditions of the components.
-
-        Returns:
-            Dict[str, float]: A dictionary containing information about the update (e.g. loss).
-        """
-        policy_changed, update_info = self.update_rule.update()
-        # If policy has been changed, and policy changes require a rebuild, rebuild the training policy
-        if policy_changed and self.policy_builder.requires_rebuild_on_policy_change:
-            self.training_policy = self.policy_builder.build_training_policy()
-
-        return update_info
 
     # Overwriting the save_checkpoint function from CompositeSaveableComponent to use it as entry point for saving
     def save_checkpoint(
@@ -410,6 +392,14 @@ class Agent(CompositeSaveableComponent):
         updated_configuration = algorithm.default_configuration.copy()
         updated_configuration.update(kwargs)
 
+        custom_configuration_keys = list(kwargs.keys())
+        for key in custom_configuration_keys:
+            if key not in updated_configuration.keys():
+                warn(
+                    f"Key {key} is not part of the default configuration of the algorithm {algorithm_id}. "
+                    "It's likely that this setting is not used by the algorithm and will be ignored.",
+                )
+
         # RNG Handler
         rng_handler = RNGHandler(seed)
         RNGHandler.set_global_instance(rng_handler=rng_handler)
@@ -430,17 +420,20 @@ class Agent(CompositeSaveableComponent):
         }
 
         # Algorithm
-        data_collector, update_rule, policy_builder = algorithm.component_factory(
-            observation_space=observation_space,
-            action_space=action_space,
-            configuration=updated_configuration,
+        data_collector, update_rule, training_policy, evaluation_policy = (
+            algorithm.component_factory(
+                observation_space=observation_space,
+                action_space=action_space,
+                configuration=updated_configuration,
+            )
         )
 
         # Agent
         agent = cls(
-            update_rule=update_rule,
-            policy_builder=policy_builder,
             data_collector=data_collector,
+            update_rule=update_rule,
+            training_policy=training_policy,
+            evaluation_policy=evaluation_policy,
             save_metadata=initialization_arguments,
         )
 

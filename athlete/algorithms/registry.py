@@ -5,7 +5,7 @@ from gymnasium.spaces import Space
 
 from athlete.data_collection.collector import DataCollector
 from athlete.update.update_rule import UpdateRule
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 
 
 @runtime_checkable
@@ -18,7 +18,7 @@ class ComponentFactory(Protocol):
         observation_space: Space,
         action_space: Space,
         configuration: Dict[str, Any],
-    ) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+    ) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
         """Create the three main components of an algorithm.
            DataCollector, UpdateRule and PolicyBuilder.
 
@@ -29,9 +29,9 @@ class ComponentFactory(Protocol):
                 all necessary information to create the components.
 
         Returns:
-            Tuple[DataCollector, UpdateRule, PolicyBuilder]:
-                The three main components of an algorithm.
-                DataCollector, UpdateRule and PolicyBuilder.
+            Tuple[DataCollector, UpdateRule, Policy, Policy]:
+                The components of an algorithm.
+                DataCollector, UpdateRule TrainingPolicy and EvaluationPolicy.
         """
         ...
 

@@ -145,11 +145,7 @@ class DQNUpdate(UpdateRule, CompositeSaveableComponent):
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
             gradient_max_norm=gradient_max_norm,
             update_frequency=value_net_update_frequency,
-            changes_policy=True,
         )
-
-        # This is required because dqn value update might needs to know during which step it was last updated to calculated number of updates.
-        self.register_saveable_component("value_update", self.value_function_update)
 
         # Target Net Update
 

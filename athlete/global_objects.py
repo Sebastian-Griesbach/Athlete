@@ -1,33 +1,32 @@
 import os
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 import torch
 
 from athlete.saving.saveable_component import SaveContext
+from athlete import constants
+
+# TODO test algorithm with updated StepTracker implementation
 
 
 class StepTracker:
-    """The StepTracker holds the number of interactions, episodes and datapoints added to the replay buffer.
-    This information might be useful for updating conditions. This class can be used as a singleton.
-    """
+    """The StepTracker tracks information that is relevant for the update conditions of the updatable components."""
 
     FILE_SAVE_NAME = "step_tracker"
-
     _instance = None
 
     @classmethod
     def get_instance(cls) -> "StepTracker":
         """Returns the global instance of the StepTracker.
 
-        Raises:
-            Exception: If the instance has not been initialized.
-
         Returns:
-            StepTracker: The global instance of the StepTracker.
+            StepTracker: The singleton instance
         """
         if cls._instance is None:
-            raise Exception("TrainingTracker has not been initialized.")
+            raise Exception(
+                "StepTracker has not been initialized. Please call set_global_instance() first."
+            )
         return cls._instance
 
     @classmethod
@@ -35,44 +34,95 @@ class StepTracker:
         """Sets the global instance of the StepTracker.
 
         Args:
-            instance (StepTracker): The instance to set as the global instance.
+            step_tracker (StepTracker): The instance to set as the global instance.
         """
         cls._instance = instance
 
-    def __init__(self, warmup_steps: int) -> None:
-        """Initializes a StepTracker instance. Can be different from the global instance.
+    def __init__(self, warmup_steps: int = 0) -> None:
+        """Initializes a StepTracker instance.
 
         Args:
-            warmup_steps (int): Number of warmup steps that an algorithm might perform, this affects the interactions_after_warmup property.
+            warmup_steps (int): Number of warmup steps that an algorithm might perform,
+                this affects the interactions_after_warmup property.
         """
-        self.total_interactions = 0
-        self.total_number_of_datapoints_added = 0
-        self.total_number_of_episodes = 0
-        self.warmup_steps = warmup_steps
+        self.registered_trackers: dict[str, int] = {}
+        self.meta_data: dict[str, Any] = {}
 
-    def increment_environment_interaction(self, num_interactions: int = 1) -> None:
-        """Increments the number of interactions with the environment.
+        self.register_tracker(
+            id=constants.TRACKER_ENVIRONMENT_INTERACTIONS, inital_value=0
+        )
+        self.register_tracker(id=constants.TRACKER_ENVIRONMENT_EPISODES, inital_value=0)
+        self.register_tracker(id=constants.TRACKER_DATA_POINTS, inital_value=0)
+
+        self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS] = warmup_steps
+
+    def register_tracker(self, id: str, inital_value: int = 0) -> str:
+        """Registers a tracker with a unique ID. If the ID is already registered a number will be appended to the ID to make it unique.
 
         Args:
-            num_interactions (int, optional): Number of interactions to add. Defaults to 1.
-        """
-        self.total_interactions += num_interactions
+            id (str): Identifier for the tracker.
+            inital_value (int, optional): Initial value for the tracker. Defaults to 0.
 
-    def increment_datapoint(self, num_datapoints: int = 1) -> None:
-        """Increments the number of collected datapoints, what exactly this means depends on the algorithm.
+        Returns:
+            str: The ID that was finally used for the tracker, which might be different from the input ID if it was already registered.
+        """
+        if id not in self.registered_trackers:
+            self.registered_trackers[id] = inital_value
+            return id
+
+        # If the ID is already registered, append a number to make it unique
+        i = 2
+        id_candidate = f"{id}_{i}"
+        while id_candidate in self.registered_trackers:
+            i += 1
+            id_candidate = f"{id}_{i}"
+
+        self.registered_trackers[id_candidate] = inital_value
+        return id_candidate
+
+    def increment_tracker(self, id: str, increment: int = 1) -> None:
+        """Increments the value of a registered tracker.
 
         Args:
-            num_datapoints (int, optional): Number of datapoints to add. Defaults to 1.
-        """
-        self.total_number_of_datapoints_added += num_datapoints
+            id (str): Identifier for the tracker.
+            increment (int, optional): Value to increment the tracker by. Defaults to 1.
 
-    def increment_episode(self, num_episodes: int = 1) -> None:
-        """Increments the number of episodes.
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
+        """
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        self.registered_trackers[id] += increment
+
+    def set_tracker_value(self, id: str, value: int) -> None:
+        """Sets the value of a registered tracker.
 
         Args:
-            num_episodes (int, optional): Number of episodes to add. Defaults to 1.
+            id (str): Identifier for the tracker.
+            value (int): Value to set for the tracker.
+
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
         """
-        self.total_number_of_episodes += num_episodes
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        self.registered_trackers[id] = value
+
+    def get_tracker_value(self, id: str) -> int:
+        """Gets the value of a registered tracker.
+
+        Args:
+            id (str): Identifier for the tracker.
+
+        Raises:
+            KeyError: If the tracker with the given ID is not registered.
+
+        Returns:
+            int: Value of the tracker.
+        """
+        if id not in self.registered_trackers:
+            raise KeyError(f"Tracker with ID '{id}' is not registered.")
+        return self.registered_trackers[id]
 
     @property
     def interactions_after_warmup(self) -> int:
@@ -81,23 +131,33 @@ class StepTracker:
         Returns:
             int: Number of interactions after the warmup period.
         """
-        return max(0, self.total_interactions - self.warmup_steps)
+        return max(
+            0,
+            self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
+            - self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS],
+        )
 
     @property
-    def warmup_is_done(self) -> bool:
+    def is_warmup_done(self) -> bool:
         """Checks if the warmup period is done.
 
         Returns:
             bool: True if the warmup period is done, False otherwise.
         """
-        return self.total_interactions >= self.warmup_steps
+        return (
+            self.get_tracker_value(id=constants.TRACKER_ENVIRONMENT_INTERACTIONS)
+            >= self.meta_data[constants.GENERAL_ARGUMENT_WARMUP_STEPS]
+        )
 
     def save_checkpoint(self, context: SaveContext) -> None:
+        """Saves the state of the step tracker to a checkpoint.
 
+        Args:
+            context (SaveContext): The context for saving the checkpoint.
+        """
         to_save = (
-            self.total_interactions,
-            self.total_number_of_episodes,
-            self.total_number_of_datapoints_added,
+            self.registered_trackers,
+            self.meta_data,
         )
         save_path = os.path.join(
             context.save_path, context.prefix + self.FILE_SAVE_NAME
@@ -106,21 +166,24 @@ class StepTracker:
         context.file_handler.save_to_file(to_save=to_save, save_path=save_path)
 
     def load_checkpoint(self, context: SaveContext) -> None:
+        """Loads the state of the step tracker from a checkpoint.
 
+        Args:
+            context (SaveContext): The context for loading the checkpoint.
+        """
         load_path = os.path.join(
             context.save_path, context.prefix + self.FILE_SAVE_NAME
         )
 
         (
-            self.total_interactions,
-            self.total_number_of_episodes,
-            self.total_number_of_datapoints_added,
+            self.registered_trackers,
+            self.meta_data,
         ) = context.file_handler.load_from_file(load_path=load_path)
 
 
 class RNGHandler:
     """This class handles random number generation to ensure reproducibility across training runs.
-    It should be used as a singleton. It sets the global seed for numpy and torch as well as provides 
+    It should be used as a singleton. It sets the global seed for numpy and torch as well as provides
     a consistent random number generator instance from numpy that can be accessed throughout the codebase.
     """
 

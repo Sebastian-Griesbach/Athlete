@@ -264,9 +264,9 @@ agent = athlete.make(
 
 # How to Register Your Algorithm
 
-The Agent itself is a concrete class that uses three components to implement any RL algorithm. By defining these three components you define your RL algorithm. The following provides a conceptual overview of the structure. For further details refer to the Docstring in the code.
+The Agent itself is a concrete class that uses several components to implement any RL algorithm. By defining these components you define your RL algorithm. The following provides a conceptual overview of the structure. For further details refer to the Docstring in the code.
 
-## The Three Components
+## The Components
 
 ### 1. Data Collector
 
@@ -300,16 +300,16 @@ As an example, the update rule of DQN consists of three updatable components:
 
 These components can be mixed and matched to create other algorithms. The replay buffer and target network updates, for example, are also used in DDPG, TD3, and SAC.
 
-### 3. Policy Builder
+### 3. & 4. Training Policy and Evaluaiton Policy
 
-The _Policy Builder_ constructs policies which are responsible for selecting an action for the agent.
-It has separate functions for creating training and evaluation policies which are used during training or evaluation mode of the agent. It offers an option to rebuild policies if needed, e.g., when a network structure changes or an embedding has to be recalculated.
+The _Policies_ are responsible for selecting an action for the agent.
+Separate policies are used during training or evaluation mode of the agent, to enable exploration during training and focus on exploitaiton during evaluation.
 
-The Policies themselves must implement the `act(observation)` function, which takes an observation and returns an action as well as a policy info dictionary. The policy info can be used for logging as it is returned as part of the agent info, or can also be picked up by the _Data Collector_ e.g., for recording action log probabilities.
+The Policies must implement the `act(observation)` function, which takes an observation and returns an action as well as a policy info dictionary. The policy info can be used for logging as it is returned as part of the agent info, or can also be picked up by the _Data Collector_ e.g., for recording action log probabilities.
 
 ## Algorithm Registration
 
-After defining the three components of your algorithm, write a function following the _Component Factory_ protocol (defined in `algorithms/registry.py`). This function should take action and observation Space objects as well as a dictionary for the configuration as input and should return a _Data Collector_, _Update Rule_, and _Policy Builder_ in that order as a tuple.
+After defining the three components of your algorithm, write a function following the _Component Factory_ protocol (defined in `algorithms/registry.py`). This function should take action and observation Space objects as well as a dictionary for the configuration as input and should return a _Data Collector_, _Update Rule_, _Training Policy_ and _Evaluation Policy_ in that order as a tuple.
 
 Additionally, define a default configuration which contains the default settings of your algorithm.
 

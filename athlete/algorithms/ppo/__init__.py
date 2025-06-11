@@ -6,12 +6,16 @@ from gymnasium.spaces import Space, Box
 import athlete
 from athlete.data_collection.collector import DataCollector
 from athlete.update.update_rule import UpdateRule
-from athlete.policy.policy_builder import PolicyBuilder
+from athlete.policy.policy import Policy
 from athlete import constants
 from athlete.algorithms.ppo.module import GaussianActor, FCPPOValueFunction
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.data_collection.on_policy import OnPolicyDataCollector
-from athlete.algorithms.ppo.policy import INFO_KEY_LOG_PROB, PPOPolicyBuilder
+from athlete.algorithms.ppo.policy import (
+    INFO_KEY_LOG_PROB,
+    PPOTrainingPolicy,
+    PPOEvaluationPolicy,
+)
 from athlete.algorithms.ppo.update import PPOUpdate
 
 # Proximal Policy Optimization
@@ -79,7 +83,7 @@ def make_ppo_components(
     observation_space: Space,
     action_space: Space,
     configuration: Dict[str, Any],
-) -> Tuple[DataCollector, UpdateRule, PolicyBuilder]:
+) -> Tuple[DataCollector, UpdateRule, Policy, Policy]:
     """Creates the components for a PPO agent.
 
     Args:
@@ -88,7 +92,7 @@ def make_ppo_components(
         configuration: Algorithm configuration dictionary
 
     Returns:
-        Tuple containing data collector, update rule and policy builder
+        Tuple containing data collector, update rule, training policy, and evaluation policy
 
     Raises:
         ValueError: If observation_space or action_space is not Box
@@ -153,10 +157,19 @@ def make_ppo_components(
         device=configuration[ARGUMENT_DEVICE],
     )
 
-    # POLICY BUILDER
-    policy_builder = PPOPolicyBuilder(actor=actor_network, action_space=action_space)
+    # POLICY
 
-    return data_collector, update_rule, policy_builder
+    training_policy = PPOTrainingPolicy(
+        actor=actor_network,
+        action_space=action_space,
+    )
+
+    evaluation_policy = PPOEvaluationPolicy(
+        actor=actor_network,
+        action_space=action_space,
+    )
+
+    return data_collector, update_rule, training_policy, evaluation_policy
 
 
 athlete.register(

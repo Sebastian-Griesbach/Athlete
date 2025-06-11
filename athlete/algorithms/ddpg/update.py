@@ -171,7 +171,6 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
             critic_optimizer=self.critic_optimizer,
             target_actor=self.target_actor,
             discount=discount,
-            changes_policy=False,
             update_frequency=critic_update_frequency,
             number_of_updates=critic_number_of_updates,
             multiply_number_of_updates_by_environment_steps=(
@@ -195,7 +194,6 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
             actor=self.actor,
             actor_optimizer=self.actor_optimizer,
             critic=self.critic,
-            changes_policy=True,
             update_frequency=actor_update_frequency,
             number_of_updates=actor_number_of_updates,
             multiply_number_of_updates_by_environment_steps=(
@@ -210,7 +208,6 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
             source_net=self.critic,
             target_net=self.target_critic,
             tau=target_critic_tau,
-            changes_policy=False,
             update_frequency=target_critic_update_frequency,
         )
 
@@ -219,7 +216,6 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
             source_net=self.actor,
             target_net=self.target_actor,
             tau=target_actor_tau,
-            changes_policy=False,
             update_frequency=target_actor_update_frequency,
         )
 

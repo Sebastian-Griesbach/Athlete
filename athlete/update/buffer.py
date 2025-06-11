@@ -17,7 +17,7 @@ from athlete.global_objects import RNGHandler
 
 class Buffer(ABC):
     """Base class for replay buffers commonly used in off-policy reinforcement learning algorithms.
-    
+
     This abstract class defines the interface that all buffer implementations should follow,
     providing standard methods for adding transitions and sampling batches of experiences.
     """

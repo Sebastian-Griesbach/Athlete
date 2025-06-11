@@ -161,7 +161,7 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             )
         else:
             self.temperature = torch.nn.Parameter(
-                torch.log(torch.tensor(self.temperature, requires_grad=False))
+                torch.log(torch.tensor(temperature, requires_grad=False))
             )
 
         if target_entropy == self.SETTING_AUTO:
@@ -233,10 +233,8 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             update_frequency=critic_update_frequency,
             number_of_updates=critic_number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
-            changes_policy=False,
             gradient_max_norm=critic_gradient_max_norm,
             log_tag=SACCriticUpdate.CRITIC_LOSS_LOG_TAG,
-            save_file_name=SACCriticUpdate.SAVE_HANDLING_STATS,
         )
 
         # Actor Update
@@ -258,9 +256,7 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             number_of_updates=actor_number_of_updates,
             multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
             gradient_max_norm=actor_gradient_max_norm,
-            changes_policy=True,
             log_tag=SACActorUpdate.ACTOR_LOSS_LOG_TAG,
-            save_file_name=SACActorUpdate.SAVE_HANDLING_STATS,
         )
 
         if self.automatic_temperature_update:
@@ -275,11 +271,9 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
                 update_frequency=critic_update_frequency,
                 number_of_updates=critic_number_of_updates,
                 multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
-                changes_policy=False,
                 gradient_max_norm=None,
                 temperature_log_tag=SACTemperatureUpdate.TEMPERATURE_LOG_TAG,
                 loss_log_tag=SACTemperatureUpdate.TEMPERATURE_LOSS_LOG_TAG,
-                save_file_name=SACTemperatureUpdate.SAVE_HANDLING_STATS,
             )
 
         # Target Critic Update
@@ -287,7 +281,6 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             source_net=self.critic_1,
             target_net=self.target_critic_1,
             tau=target_critic_tau,
-            changes_policy=False,
             update_frequency=target_critic_update_frequency,
         )
 
@@ -295,7 +288,6 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             source_net=self.critic_2,
             target_net=self.target_critic_2,
             tau=target_critic_tau,
-            changes_policy=False,
             update_frequency=target_critic_update_frequency,
         )
 
