@@ -33,7 +33,6 @@ class PPOBufferUpdate(UpdatableComponent):
         discount: float,
         generalized_advantage_estimation_lambda: float,
         on_policy_buffer: OnPolicyBuffer,
-        # TODO continue updating step tracker implementations (updateable components, and update rules, no more saving required)
     ) -> None:
         """Initializes the PPOBufferUpdate class.
 
@@ -139,9 +138,6 @@ class PPOBufferUpdate(UpdatableComponent):
         ) > self.step_tracker.get_tracker_value(
             id=self._last_datapoint_updated_on_tracker_id
         )
-
-
-# TODO continue updating the implementation of step tracker
 
 
 class PPOGradientUpdate(UpdatableComponent):

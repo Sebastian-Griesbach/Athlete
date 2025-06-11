@@ -30,13 +30,13 @@ class StepTracker:
         return cls._instance
 
     @classmethod
-    def set_global_instance(cls, step_tracker: "StepTracker") -> None:
+    def set_global_instance(cls, instance: "StepTracker") -> None:
         """Sets the global instance of the StepTracker.
 
         Args:
             step_tracker (StepTracker): The instance to set as the global instance.
         """
-        cls._instance = step_tracker
+        cls._instance = instance
 
     def __init__(self, warmup_steps: int = 0) -> None:
         """Initializes a StepTracker instance.

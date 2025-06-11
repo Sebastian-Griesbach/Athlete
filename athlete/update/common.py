@@ -87,7 +87,12 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
             self.number_of_updates
             if not self.multiply_number_of_updates_by_environment_steps
             else self.number_of_updates
-            * (self.step_tracker.interactions_after_warmup - self._last_update_step)
+            * (
+                self.step_tracker.interactions_after_warmup
+                - self.step_tracker.get_tracker_value(
+                    id=self._last_interaction_updated_on_tracker_id
+                )
+            )
         )
 
         # Tracking the last update step and episode for update condition and number of updates

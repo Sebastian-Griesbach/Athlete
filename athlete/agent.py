@@ -206,9 +206,8 @@ class Agent(CompositeSaveableComponent):
         update_info = {}
         if new_data_point_accumulated:
             self.step_tracker.increment_tracker(id=constants.TRACKER_DATA_POINTS)
-            # TODO this shouldn't depend on whether a new data point was collected,
-            # instead all update conditions should consider this information themselfs
-            update_info = self.update_rule.update()
+
+        update_info = self.update_rule.update()
 
         self.last_action, self.last_policy_info = self.training_policy.reset_act(
             observation=observation

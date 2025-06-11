@@ -76,7 +76,7 @@ class DDPGTrainingPolicy(Policy):
                 the unscaled action.
         """
 
-        if not self.step_tracker.is_warmup_done():
+        if not self.step_tracker.is_warmup_done:
             random_action = self.random_number_generator.random(
                 size=self.action_space.shape
             )

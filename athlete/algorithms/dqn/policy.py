@@ -15,8 +15,6 @@ class DQNTrainingPolicy(Policy):
     value decays over time according to configured parameters.
     """
 
-    SAVE_FILE_NAME = "dqn_training_policy"
-
     def __init__(
         self,
         q_value_function: torch.nn.Module,
@@ -72,7 +70,7 @@ class DQNTrainingPolicy(Policy):
             Tuple[int, Dict[str, Any]]: The chosen action and a dictionary with additional information: the current epsilon value and whether the action was chosen greedily.
         """
         # Warmup period
-        if not self.step_tracker.is_warmup_done():
+        if not self.step_tracker.is_warmup_done:
             return self._get_random_action(), {
                 "greedy": False,
                 "epsilon": self.start_epsilon,
