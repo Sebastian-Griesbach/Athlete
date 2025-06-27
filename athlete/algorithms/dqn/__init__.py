@@ -161,7 +161,7 @@ def make_dqn_components(
         end_epsilon=configuration[ARGUMENT_END_EPSILON],
         epsilon_decay_steps=configuration[ARGUMENT_EPSILON_DECAY_STEPS],
         post_replay_buffer_preprocessing=configuration[
-            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
+            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING  # TODO only pass the preprocessing for the observation if is exists
         ],
     )
 
