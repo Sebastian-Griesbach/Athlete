@@ -1,10 +1,9 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 import numpy as np
 from operator import itemgetter
 
 from athlete.update.buffer import Buffer
 from athlete.saving.file_handler import FileHandler
-from athlete.function import chain_functions
 from athlete.saving.saveable_component import SaveContext
 
 
@@ -153,7 +152,9 @@ class PostBufferPreprocessingWrapper(InputOutputWrapper):
         """
 
         preprocessed_values = map(
-            chain_functions,
+            lambda preprocessing_function, field_value: preprocessing_function(
+                field_value
+            ),
             self.post_replay_buffer_preprocessing.values(),
             self.field_getter(data_dictionary),
         )

@@ -153,6 +153,16 @@ def make_dqn_components(
     )
 
     # POLICY
+    # if there is preprocessing only use the observation preprocessing
+    post_replay_buffer_preprocessing = (
+        configuration[ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING].get(
+            constants.DATA_OBSERVATIONS, None
+        )
+        if isinstance(
+            configuration[ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING], dict
+        )
+        else None
+    )
 
     training_policy = DQNTrainingPolicy(
         q_value_function=update_rule.q_value_function,
@@ -160,16 +170,12 @@ def make_dqn_components(
         start_epsilon=configuration[ARGUMENT_START_EPSILON],
         end_epsilon=configuration[ARGUMENT_END_EPSILON],
         epsilon_decay_steps=configuration[ARGUMENT_EPSILON_DECAY_STEPS],
-        post_replay_buffer_preprocessing=configuration[
-            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING  # TODO only pass the preprocessing for the observation if is exists
-        ],
+        post_replay_buffer_preprocessing=post_replay_buffer_preprocessing,
     )
 
     evaluation_policy = DQNEvaluationPolicy(
         q_value_function=update_rule.q_value_function,
-        post_replay_buffer_preprocessing=configuration[
-            ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING
-        ],
+        post_replay_buffer_preprocessing=post_replay_buffer_preprocessing,
     )
 
     return data_collector, update_rule, training_policy, evaluation_policy
