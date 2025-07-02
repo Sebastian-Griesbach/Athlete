@@ -300,7 +300,7 @@ As an example, the update rule of DQN consists of three updatable components:
 
 These components can be mixed and matched to create other algorithms. The replay buffer and target network updates, for example, are also used in DDPG, TD3, and SAC.
 
-### 3. & 4. Training Policy and Evaluaiton Policy
+### 3. & 4. Training Policy and Evaluation Policy
 
 The _Policies_ are responsible for selecting an action for the agent.
 Separate policies are used during training or evaluation mode of the agent, to enable exploration during training and focus on exploitaiton during evaluation.
