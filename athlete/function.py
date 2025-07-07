@@ -137,6 +137,26 @@ def extract_data_from_batch(
     )
 
 
+def jax_extract_data_from_batch(
+    data_batch: Dict[str, np.ndarray], keys: List[str]
+) -> Dict[str, torch.Tensor]:
+    """Extracts data from a batch.
+
+    Args:
+        data_batch (Dict[str, np.ndarray]): Batch of data to be extracted.
+        keys (List[str]): List of keys to extract from the batch.
+
+    Returns:
+        Dict[str, torch.Tensor]: Extracted data.
+    """
+    return dict(
+        zip(
+            keys,
+            single_safe_itemgetter(keys)(data_batch),
+        )
+    )
+
+
 def create_transition_data_info(
     observation_space: Space, action_space: Space
 ) -> Dict[str, Dict[str, Any]]:
