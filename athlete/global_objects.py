@@ -3,6 +3,7 @@ from typing import Optional, Any
 
 import numpy as np
 import torch
+import jax
 
 from athlete.saving.saveable_component import SaveContext
 from athlete import constants
@@ -262,8 +263,19 @@ class RNGHandler:
         torch.cuda.manual_seed_all(seed)
 
         # Create a random number generator instance
-        # Best practice always use this one if possible
         self._random_number_generator = np.random.default_rng(seed)
+        # JAX random key
+        # This is a global key that can be used to generate subkeys for JAX operations
+        self._current_jax_key = jax.random.key(seed)
+
+    def get_jax_key(self) -> jax.Array:
+        """Generates a new JAX random key from the current key.
+
+        Returns:
+            jax.Array: A new JAX random key that can be used for JAX operations.
+        """
+        self._current_jax_key, subkey = jax.random.split(self._current_jax_key)
+        return subkey
 
     def save_checkpoint(self, context: SaveContext) -> None:
 
@@ -282,7 +294,14 @@ class RNGHandler:
         # Random number generator state
         rng_state = self._random_number_generator.bit_generator.state
 
-        to_save = (self.seed, np_state, torch_state, cuda_states, rng_state)
+        to_save = (
+            self.seed,
+            np_state,
+            torch_state,
+            cuda_states,
+            rng_state,
+            self._current_jax_key,
+        )
 
         context.file_handler.save_to_file(
             to_save=to_save,
@@ -299,7 +318,14 @@ class RNGHandler:
             )
         )
 
-        self.seed, np_state, torch_state, cuda_states, rng_state = loaded
+        (
+            self.seed,
+            np_state,
+            torch_state,
+            cuda_states,
+            rng_state,
+            self._current_jax_key,
+        ) = loaded
         # Set global numpy random state
         np.random.set_state(np_state)
 
