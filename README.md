@@ -340,3 +340,16 @@ Further features might be added as they are needed. There will be breaking chang
 
 I'm happy about any feedback for athlete if you tried it. What issues did you have, what do you think could be simplified?
 Simply open a Github issue and let's talk :)
+
+# Citation
+
+```bibtex
+@misc{athlete,
+  author       = {Sebastian Griesbach},
+  title        = {Athlete: An API for reinforcement learning agents},
+  year         = {2025},
+  publisher    = {GitHub},
+  journal      = {GitHub repository},
+  howpublished = {\url{https://github.com/Sebastian-Griesbach/Athlete}},
+}
+```
