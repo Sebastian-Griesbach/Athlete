@@ -6,6 +6,7 @@ import torch
 import numpy as np
 
 from athlete.saving.file_handler import FileHandler
+from athlete.jax_objects import MutableJaxModule, MutableOptaxOptimizer
 
 
 @dataclass
@@ -327,6 +328,40 @@ def load_torch_parameter(
     to_load.data.copy_(loaded)
 
 
+def save_mutable_jax_module(
+    to_save: MutableJaxModule, context: SaveContext, filename: str
+) -> None:
+    """Save a MutableJaxModule."""
+    save_path = os.path.join(context.save_path, context.prefix + filename)
+    context.file_handler.save_to_file(to_save.get(), save_path)
+
+
+def load_mutable_jax_module(
+    to_load: MutableJaxModule, context: SaveContext, filename: str
+) -> None:
+    """Load a MutableJaxModule."""
+    load_path = os.path.join(context.save_path, context.prefix + filename)
+    loaded = context.file_handler.load_from_file(load_path)
+    to_load.set(loaded)
+
+
+def save_mutable_optax_optimizer(
+    to_save: MutableOptaxOptimizer, context: SaveContext, filename: str
+) -> None:
+    """Save a MutableOptaxOptimizer."""
+    save_path = os.path.join(context.save_path, context.prefix + filename)
+    context.file_handler.save_to_file(to_save.get(), save_path)
+
+
+def load_mutable_optax_optimizer(
+    to_load: MutableOptaxOptimizer, context: SaveContext, filename: str
+) -> None:
+    """Load a MutableOptaxOptimizer."""
+    load_path = os.path.join(context.save_path, context.prefix + filename)
+    loaded = context.file_handler.load_from_file(load_path)
+    to_load.set(loaded)
+
+
 # Register the savers
 SaverRegistry.register(torch.nn.Module, save_torch_module, load_torch_module)
 SaverRegistry.register(
@@ -334,3 +369,11 @@ SaverRegistry.register(
 )
 SaverRegistry.register(np.ndarray, save_default, load_numpy_array)
 SaverRegistry.register(torch.nn.Parameter, save_torch_parameter, load_torch_parameter)
+SaverRegistry.register(
+    MutableJaxModule, save_mutable_jax_module, load_mutable_jax_module
+)
+SaverRegistry.register(
+    MutableOptaxOptimizer,
+    save_mutable_optax_optimizer,
+    load_mutable_optax_optimizer,
+)
