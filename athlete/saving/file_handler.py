@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import torch
 from typing import Any
 
+import cloudpickle
+
 
 class FileHandler(ABC):
     """Abstract interface for file operations used in saving and loading checkpoints.
@@ -107,3 +109,34 @@ class TorchFileHandler(FileHandler):
             Any: Loaded object.
         """
         return torch.load(load_path + ".pt", weights_only=False)
+
+
+class CloudPickleFileHandler(FileHandler):
+    """Implementation of a FileHandler that uses cloudpickle for better function serialization."""
+
+    def __init__(self) -> None:
+        super().__init__()
+
+    def _file_save_operation(self, to_save: Any, save_path: str) -> None:
+        """Saves file using cloudpickle. It adds ".pkl" to the file name.
+
+        Args:
+            to_save (Any): Object to save.
+            save_path (str): Path to save the file.
+        """
+        with open(save_path + ".pkl", "wb") as f:
+            cloudpickle.dump(
+                to_save, f, protocol=4
+            )  # Using pickle protocol 4 for consistency
+
+    def _load_file_operation(self, load_path: str) -> Any:
+        """Loads file using cloudpickle. It adds ".pkl" to the file name."
+
+        Args:
+            load_path (str): Path to load the file from.
+
+        Returns:
+            Any: Loaded object.
+        """
+        with open(load_path + ".pkl", "rb") as f:
+            return cloudpickle.load(f)

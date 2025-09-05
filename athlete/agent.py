@@ -10,7 +10,7 @@ from athlete.update.update_rule import UpdateRule
 from athlete.global_objects import StepTracker, RNGHandler
 from athlete.policy.policy import Policy
 from athlete.saving.saveable_component import CompositeSaveableComponent, SaveContext
-from athlete.saving.file_handler import FileHandler, TorchFileHandler
+from athlete.saving.file_handler import FileHandler, CloudPickleFileHandler
 from athlete import constants
 from athlete.algorithms.registry import AlgorithmRegistry
 
@@ -246,7 +246,7 @@ class Agent(CompositeSaveableComponent):
             )
 
         if file_handler is None:
-            file_handler = TorchFileHandler()
+            file_handler = CloudPickleFileHandler()
 
         self.save_metadata[constants.SAVE_ARGUMENT_SAVE_ENVIRONMENT_STATE] = (
             save_environment_state
@@ -308,7 +308,7 @@ class Agent(CompositeSaveableComponent):
     def from_checkpoint(
         cls,
         checkpoint_path: str,
-        file_handler: Optional[FileHandler] = TorchFileHandler(),
+        file_handler: Optional[FileHandler] = CloudPickleFileHandler(),
         load_environment_state: bool = False,
     ) -> "Agent":
         """Load an agent from a checkpoint to continue training from or perform evaluation.
