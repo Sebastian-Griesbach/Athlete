@@ -5,6 +5,8 @@ from typing import Union, List, Callable, Any, Tuple, Dict
 import numpy as np
 import torch
 from gymnasium.spaces import Space
+import jax
+import jax.numpy as jnp
 
 from athlete import constants
 
@@ -188,3 +190,8 @@ def create_transition_data_info(
         constants.DATA_ACTIONS: action_info,
         constants.DATA_TERMINATEDS: {"shape": (1,), "dtype": np.bool_},
     }
+
+
+@jax.jit
+def jax_mse_loss(predictions: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
+    return jnp.mean((predictions - targets) ** 2)

@@ -14,11 +14,11 @@ from athlete.algorithms.sac.updatable_components import (
     SACActorUpdate,
     SACTemperatureUpdate,
 )
-from athlete.update.common import TargetNetUpdate
+from athlete.update.common import TorchTargetNetUpdate
 from athlete.saving.saveable_component import CompositeSaveableComponent
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import EpisodicCPPReplayBuffer
-from athlete.update.common import TargetNetUpdate, ReplayBufferUpdate
+from athlete.update.common import TorchTargetNetUpdate, ReplayBufferUpdate
 from athlete.update.buffer_wrapper import (
     PostBufferPreprocessingWrapper,
 )
@@ -277,14 +277,14 @@ class SACUpdate(UpdateRule, CompositeSaveableComponent):
             )
 
         # Target Critic Update
-        self.target_critic_1_update = TargetNetUpdate(
+        self.target_critic_1_update = TorchTargetNetUpdate(
             source_net=self.critic_1,
             target_net=self.target_critic_1,
             tau=target_critic_tau,
             update_frequency=target_critic_update_frequency,
         )
 
-        self.target_critic_2_update = TargetNetUpdate(
+        self.target_critic_2_update = TorchTargetNetUpdate(
             source_net=self.critic_2,
             target_net=self.target_critic_2,
             tau=target_critic_tau,

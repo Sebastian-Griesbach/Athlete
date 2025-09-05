@@ -10,11 +10,11 @@ from athlete import constants
 from athlete.update.update_rule import UpdateRule, UpdatableComponent
 from athlete.algorithms.ddpg.updatable_components import DDPGActorUpdate
 from athlete.algorithms.td3.updatable_components import TD3CriticUpdate
-from athlete.update.common import TargetNetUpdate
+from athlete.update.common import TorchTargetNetUpdate
 from athlete.saving.saveable_component import CompositeSaveableComponent
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import EpisodicCPPReplayBuffer
-from athlete.update.common import TargetNetUpdate, ReplayBufferUpdate
+from athlete.update.common import TorchTargetNetUpdate, ReplayBufferUpdate
 from athlete.update.buffer_wrapper import (
     PostBufferPreprocessingWrapper,
 )
@@ -229,14 +229,14 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
         )
 
         # Target Critic Update
-        self.target_critic_1_update = TargetNetUpdate(
+        self.target_critic_1_update = TorchTargetNetUpdate(
             source_net=self.critic_1,
             target_net=self.target_critic_1,
             tau=target_critic_tau,
             update_frequency=target_critic_update_frequency,
         )
 
-        self.target_critic_2_update = TargetNetUpdate(
+        self.target_critic_2_update = TorchTargetNetUpdate(
             source_net=self.critic_2,
             target_net=self.target_critic_2,
             tau=target_critic_tau,
@@ -244,7 +244,7 @@ class TD3Update(UpdateRule, CompositeSaveableComponent):
         )
 
         # Target Actor Update
-        self.target_actor_update = TargetNetUpdate(
+        self.target_actor_update = TorchTargetNetUpdate(
             source_net=self.actor,
             target_net=self.target_actor,
             tau=target_actor_tau,

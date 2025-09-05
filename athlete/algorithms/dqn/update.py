@@ -8,7 +8,7 @@ from gymnasium.spaces import Box, Discrete
 from athlete import constants
 from athlete.update.update_rule import UpdateRule, UpdatableComponent
 from athlete.algorithms.dqn.updatable_components import DQNValueUpdate
-from athlete.update.common import TargetNetUpdate, ReplayBufferUpdate
+from athlete.update.common import TorchTargetNetUpdate, ReplayBufferUpdate
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import EpisodicCPPReplayBuffer
 from athlete.update.buffer_wrapper import (
@@ -149,7 +149,7 @@ class DQNUpdate(UpdateRule, CompositeSaveableComponent):
 
         # Target Net Update
 
-        self.target_net_update = TargetNetUpdate(
+        self.target_net_update = TorchTargetNetUpdate(
             source_net=q_value_function,
             target_net=self.target_net,
             tau=target_net_tau,

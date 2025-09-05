@@ -4,12 +4,22 @@ from abc import abstractmethod
 import torch
 from torch.optim import Optimizer
 import numpy as np
+import optax
+import numpy as np
+import jax
 
 from athlete.update.update_rule import UpdatableComponent
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import Buffer
 from athlete.global_objects import StepTracker
 from athlete import constants
+from athlete.update.update_rule import UpdatableComponent
+from athlete.global_objects import StepTracker
+from athlete import constants
+from athlete.jax_objects import (
+    MutableJaxModule,
+    ModuleState,
+)
 
 
 class TorchFrequentGradientUpdate(UpdatableComponent):
@@ -184,7 +194,7 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         )
 
 
-class TargetNetUpdate(UpdatableComponent):
+class TorchTargetNetUpdate(UpdatableComponent):
     """Component responsible for updating target networks in deep RL algorithms.
 
     This class handles target network updates, which are crucial for stabilizing training
@@ -246,6 +256,62 @@ class TargetNetUpdate(UpdatableComponent):
     def _hard_update(self) -> Dict[str, Any]:
         self.target_net.load_state_dict(self.source_net.state_dict())
         return {}
+
+    @property
+    def update_condition(self) -> bool:
+        # True if warmup is done and the update frequency is met, and we did not update the target network yet
+        return (
+            self.step_tracker.is_warmup_done
+            and self.step_tracker.interactions_after_warmup % self.update_frequency == 0
+            and self.step_tracker.interactions_after_warmup
+            > self.step_tracker.get_tracker_value(
+                id=self._last_interaction_updated_on_tracker_id
+            )
+        )
+
+
+class JAXTargetNetUpdate(UpdatableComponent):
+    def __init__(
+        self,
+        mutable_target_net: MutableJaxModule,
+        mutable_q_value_function: MutableJaxModule,
+        tau: float = 1.0,
+        update_frequency: int = 1,
+    ) -> None:
+        self.mutable_target_net = mutable_target_net
+        self.mutable_q_value_function = mutable_q_value_function
+        self.tau = tau
+
+        self.step_tracker = StepTracker.get_instance()
+        self._last_interaction_updated_on_tracker_id = (
+            self.step_tracker.register_tracker(
+                id="target_net_last_interaction_updated_on_tracker_id"
+            )
+        )
+        self.update_frequency = update_frequency
+
+    def update(self) -> Dict[str, Any]:
+        new_target_net = JAXTargetNetUpdate._jitable_update(
+            target_net=self.mutable_target_net.get(),
+            q_value_function=self.mutable_q_value_function.get(),
+            tau=self.tau,
+        )
+        self.mutable_target_net.set(new_target_net)
+
+        return {}
+
+    @jax.jit
+    def _jitable_update(
+        target_net: ModuleState,
+        q_value_function: ModuleState,
+        tau: float = 1.0,
+    ) -> ModuleState:
+        new_target_net_parameters = optax.incremental_update(
+            new_tensors=q_value_function.params,
+            old_tensors=target_net.params,
+            step_size=tau,
+        )
+        return target_net.replace(params=new_target_net_parameters)
 
     @property
     def update_condition(self) -> bool:

@@ -15,3 +15,4 @@ import athlete.algorithms.ddpg
 import athlete.algorithms.td3
 import athlete.algorithms.sac
 import athlete.algorithms.ppo
+import athlete.algorithms.jax_dqn

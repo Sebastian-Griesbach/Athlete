@@ -12,11 +12,11 @@ from athlete.algorithms.ddpg.updatable_components import (
     DDPGCriticUpdate,
     DDPGActorUpdate,
 )
-from athlete.update.common import TargetNetUpdate
+from athlete.update.common import TorchTargetNetUpdate
 from athlete.saving.saveable_component import CompositeSaveableComponent
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.buffer import EpisodicCPPReplayBuffer
-from athlete.update.common import TargetNetUpdate, ReplayBufferUpdate
+from athlete.update.common import TorchTargetNetUpdate, ReplayBufferUpdate
 from athlete.update.buffer_wrapper import (
     PostBufferPreprocessingWrapper,
 )
@@ -204,7 +204,7 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
         )
 
         # Target Critic Update
-        self.target_critic_update = TargetNetUpdate(
+        self.target_critic_update = TorchTargetNetUpdate(
             source_net=self.critic,
             target_net=self.target_critic,
             tau=target_critic_tau,
@@ -212,7 +212,7 @@ class DDPGUpdate(UpdateRule, CompositeSaveableComponent):
         )
 
         # Target Actor Update
-        self.target_actor_update = TargetNetUpdate(
+        self.target_actor_update = TorchTargetNetUpdate(
             source_net=self.actor,
             target_net=self.target_actor,
             tau=target_actor_tau,
