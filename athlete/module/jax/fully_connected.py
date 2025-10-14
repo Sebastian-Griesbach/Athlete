@@ -1,7 +1,16 @@
 from typing import Tuple, Callable, Optional
 
+import jax
 import jax.numpy as jnp
 import flax.linen as nn
+
+
+def make_bias_init(fan_in):
+    def bias_init(key, shape, dtype=jnp.float32):
+        limit = 1.0 / jnp.sqrt(fan_in)
+        return jax.random.uniform(key, shape, dtype, minval=-limit, maxval=limit)
+
+    return bias_init
 
 
 class FlaxNonLinearFullyConnectedNet(nn.Module):
@@ -12,8 +21,9 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     activation: Callable = nn.relu
     final_activation: Optional[Callable] = None
     initial_activation: Optional[Callable] = None
-    weight_init: Callable = nn.initializers.lecun_normal()
-    bias_init: Callable = nn.initializers.zeros
+    # Same default initialization as in Pytorch
+    weight_init: Callable = nn.initializers.lecun_uniform()
+    bias_init: Callable = None
 
     def setup(self):
         """Set up the layers of the network."""
@@ -25,7 +35,11 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
             nn.Dense(
                 features=self.layer_dims[i + 1],
                 kernel_init=self.weight_init,
-                bias_init=self.bias_init,
+                bias_init=(
+                    make_bias_init(fan_in=self.layer_dims[i])
+                    if self.bias_init is None
+                    else self.bias_init
+                ),
                 name=f"dense_{i+1}",
             )
             for i in range(num_linear_layers)

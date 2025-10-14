@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from gymnasium.spaces import Discrete
 
-from athlete.function import numpy_to_tensor
+from athlete.function import numpy_to_torch_tensor
 from athlete.global_objects import StepTracker, RNGHandler
 from athlete.policy.policy import Policy
 
@@ -92,7 +92,7 @@ class DQNTrainingPolicy(Policy):
         observation = np.expand_dims(observation, axis=0)
         if self.post_replay_buffer_preprocessing is not None:
             observation = self.post_replay_buffer_preprocessing(observation)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             q_values = self.q_value_function(observation)
         action = torch.argmax(q_values, dim=1)
@@ -136,7 +136,7 @@ class DQNEvaluationPolicy(Policy):
         observation = np.expand_dims(observation, axis=0)
         if self.post_replay_buffer_preprocessing is not None:
             observation = self.post_replay_buffer_preprocessing(observation)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             q_values = self.q_value_function(observation)
         action = torch.argmax(q_values, dim=1)

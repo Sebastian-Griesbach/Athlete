@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from gymnasium.spaces import Box
 
-from athlete.function import numpy_to_tensor, tensor_to_numpy
+from athlete.function import numpy_to_torch_tensor, torch_tensor_to_numpy
 from athlete.global_objects import StepTracker, RNGHandler
 from athlete.policy.policy import Policy
 from athlete.policy.noise import NoiseProcess
@@ -88,10 +88,10 @@ class DDPGTrainingPolicy(Policy):
         observation = np.expand_dims(observation, axis=0)
         if self.post_replay_buffer_preprocessing is not None:
             observation = self.post_replay_buffer_preprocessing(observation)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             action = self.actor(observation)
-        action = tensor_to_numpy(action).squeeze(axis=0)
+        action = torch_tensor_to_numpy(action).squeeze(axis=0)
         noise = self.noise_process.sample()
         action += noise
         action = np.clip(action, self.unscaled_low, self.unscaled_high)
@@ -146,9 +146,9 @@ class DDPGEvaluationPolicy(Policy):
         observation = np.expand_dims(observation, axis=0)
         if self.post_replay_buffer_preprocessing is not None:
             observation = self.post_replay_buffer_preprocessing(observation)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             action = self.actor(observation)
-        action = tensor_to_numpy(action).squeeze()
+        action = torch_tensor_to_numpy(action).squeeze()
         scaled_action = action * self.action_scales + self.action_offsets
         return scaled_action, {INFO_KEY_UNSCALED_ACTION: action}

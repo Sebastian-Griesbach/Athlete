@@ -10,7 +10,7 @@ from athlete import constants
 from athlete.update.on_policy_buffer import OnPolicyBuffer
 from athlete.data_collection.provider import UpdateDataProvider
 from athlete.update.update_rule import UpdatableComponent
-from athlete.function import numpy_to_tensor
+from athlete.function import numpy_to_torch_tensor
 from athlete.algorithms.ppo.module import PPOActor
 from athlete.global_objects import StepTracker
 
@@ -66,19 +66,19 @@ class PPOBufferUpdate(UpdatableComponent):
         """
         update_data = self.update_data_provider.get_data()[0]
 
-        observations = numpy_to_tensor(
+        observations = numpy_to_torch_tensor(
             update_data[constants.DATA_OBSERVATIONS], device=self.device
         )
-        actions = numpy_to_tensor(
+        actions = numpy_to_torch_tensor(
             update_data[constants.DATA_ACTIONS], device=self.device
         )
-        log_probs = numpy_to_tensor(
+        log_probs = numpy_to_torch_tensor(
             update_data[constants.DATA_LOG_PROBS], device=self.device
         )
-        rewards = numpy_to_tensor(
+        rewards = numpy_to_torch_tensor(
             update_data[constants.DATA_REWARDS], device=self.device
         )
-        next_dones = numpy_to_tensor(
+        next_dones = numpy_to_torch_tensor(
             update_data[constants.DATA_NEXT_DONES], device=self.device
         )
 

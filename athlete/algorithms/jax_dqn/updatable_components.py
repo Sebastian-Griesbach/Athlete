@@ -7,8 +7,7 @@ import numpy as np
 from jax import numpy as jnp
 import jax
 
-from athlete.update.update_rule import UpdatableComponent
-from athlete.global_objects import StepTracker
+from athlete.update.common import FrequencyUpdate
 from athlete import constants
 from athlete.jax_objects import (
     MutableJaxModule,
@@ -21,7 +20,7 @@ from athlete.jax_objects import (
 from athlete.function import jax_mse_loss
 
 
-class JAXDQNValueUpdate(UpdatableComponent):
+class JAXDQNValueUpdate(FrequencyUpdate):
     LOG_TAG_LOSS = "loss"
 
     def __init__(
@@ -39,16 +38,18 @@ class JAXDQNValueUpdate(UpdatableComponent):
         log_tag: str = LOG_TAG_LOSS,
     ) -> None:
 
+        super().__init__(
+            log_tag=log_tag,
+            update_frequency=update_frequency,
+            number_of_updates=number_of_updates,
+            multiply_number_of_updates_by_environment_steps=multiply_number_of_updates_by_environment_steps,
+        )
+
         self.mutable_q_value_function = mutable_q_value_function
         self.mutable_target_net = mutable_target_net
         self.mutable_optimizer = mutable_optimizer
         self.data_sampler = data_sampler
         self.cross_validation = cross_validation
-        self.update_frequency = update_frequency
-        self.number_of_updates = number_of_updates
-        self.multiply_number_of_updates_by_environment_steps = (
-            multiply_number_of_updates_by_environment_steps
-        )
         self.discount = discount
         self.criteria = criteria
         self.log_tag = log_tag
@@ -58,16 +59,6 @@ class JAXDQNValueUpdate(UpdatableComponent):
                 if cross_validation
                 else JAXDQNValueUpdate._calculate_target
             )
-        )
-
-        self.step_tracker = StepTracker.get_instance()
-        self._last_interaction_updated_on_tracker_id = (
-            self.step_tracker.register_tracker(
-                id="jax_frequent_update_last_interaction_updated_on_tracker_id"
-            )
-        )
-        self._last_episode_updated_on_tracker_id = self.step_tracker.register_tracker(
-            id="jax_frequent_update_last_episode_updated_on_tracker_id"
         )
 
     @partial(jax.jit, static_argnames=["criteria", "target_calculation"])
@@ -96,7 +87,6 @@ class JAXDQNValueUpdate(UpdatableComponent):
         )
 
         # calculate loss
-
         loss, gradients = jax.value_and_grad(JAXDQNValueUpdate._calculate_loss)(
             q_value_function.params,
             q_value_function=q_value_function,
@@ -176,99 +166,30 @@ class JAXDQNValueUpdate(UpdatableComponent):
         target = rewards + not_terminateds * discount * next_q_values
         return target
 
-    def update(self) -> Dict[str, Any]:
-        losses = []
-        number_of_updates = (
-            self.number_of_updates
-            if not self.multiply_number_of_updates_by_environment_steps
-            else self.number_of_updates
-            * (
-                self.step_tracker.interactions_after_warmup
-                - self.step_tracker.get_tracker_value(
-                    id=self._last_interaction_updated_on_tracker_id
-                )
-            )
+    def _update(self) -> Dict[str, Any]:
+        mini_batch = self.data_sampler()
+        observations = mini_batch[constants.DATA_OBSERVATIONS]
+        actions = mini_batch[constants.DATA_ACTIONS]
+        rewards = mini_batch[constants.DATA_REWARDS]
+        next_observations = mini_batch[constants.DATA_NEXT_OBSERVATIONS]
+        terminateds = mini_batch[constants.DATA_TERMINATEDS]
+
+        loss, new_q_value_function, new_optimizer = JAXDQNValueUpdate._jitable_update(
+            q_value_function=self.mutable_q_value_function.get(),
+            target_net=self.mutable_target_net.get(),
+            optimizer=self.mutable_optimizer.get(),
+            observations=observations,
+            actions=actions,
+            rewards=rewards,
+            next_observations=next_observations,
+            terminateds=terminateds,
+            discount=self.discount,
+            criteria=self.criteria,
+            target_calculation=self.target_calculation,
         )
 
-        # Tracking the last update step and episode for update condition and number of updates
-        self.step_tracker.set_tracker_value(
-            id=self._last_interaction_updated_on_tracker_id,
-            value=self.step_tracker.interactions_after_warmup,
-        )
-        self.step_tracker.set_tracker_value(
-            id=self._last_episode_updated_on_tracker_id,
-            value=self.step_tracker.get_tracker_value(
-                id=constants.TRACKER_ENVIRONMENT_EPISODES
-            ),
-        )
+        # update parameters and optimizer state
+        self.mutable_q_value_function.set(new_q_value_function)
+        self.mutable_optimizer.set(new_optimizer)
 
-        for _ in range(number_of_updates):
-
-            mini_batch = self.data_sampler()
-            observations = mini_batch[constants.DATA_OBSERVATIONS]
-            actions = mini_batch[constants.DATA_ACTIONS]
-            rewards = mini_batch[constants.DATA_REWARDS]
-            next_observations = mini_batch[constants.DATA_NEXT_OBSERVATIONS]
-            terminateds = mini_batch[constants.DATA_TERMINATEDS]
-
-            loss, new_q_value_function, new_optimizer = (
-                JAXDQNValueUpdate._jitable_update(
-                    q_value_function=self.mutable_q_value_function.get(),
-                    target_net=self.mutable_target_net.get(),
-                    optimizer=self.mutable_optimizer.get(),
-                    observations=observations,
-                    actions=actions,
-                    rewards=rewards,
-                    next_observations=next_observations,
-                    terminateds=terminateds,
-                    discount=self.discount,
-                    criteria=self.criteria,
-                    target_calculation=self.target_calculation,
-                )
-            )
-
-            # update parameters and optimizer state
-            self.mutable_q_value_function.set(new_q_value_function)
-            self.mutable_optimizer.set(new_optimizer)
-
-            losses.append(loss.item())
-
-        log_data = {self.log_tag: np.mean(losses).item()}
-        return log_data
-
-    @property
-    def update_condition(self) -> bool:
-        if self.update_frequency > 0:
-            # Update if training frequency is met
-            return (
-                self.step_tracker.is_warmup_done
-                and (
-                    self.step_tracker.interactions_after_warmup % self.update_frequency
-                    == 0
-                )  # But only if the effective number of updates is > 0
-                and (
-                    not self.multiply_number_of_updates_by_environment_steps
-                    or (
-                        self.step_tracker.interactions_after_warmup
-                        > self.step_tracker.get_tracker_value(
-                            self._last_interaction_updated_on_tracker_id
-                        )
-                    )
-                )
-            )
-        # If update_frequency is <= 0, we update when an episode ends
-        return (
-            self.step_tracker.is_warmup_done
-            and (
-                self.step_tracker.get_tracker_value(
-                    id=constants.TRACKER_ENVIRONMENT_EPISODES
-                )
-                > self.step_tracker.get_tracker_value(
-                    id=self._last_episode_updated_on_tracker_id
-                )
-            )
-            and self.step_tracker.interactions_after_warmup
-            > self.step_tracker.get_tracker_value(
-                id=self._last_interaction_updated_on_tracker_id
-            )
-        )
+        return loss.item()

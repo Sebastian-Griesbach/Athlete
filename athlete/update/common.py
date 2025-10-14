@@ -22,58 +22,38 @@ from athlete.jax_objects import (
 )
 
 
-class TorchFrequentGradientUpdate(UpdatableComponent):
-    """Base class for components that require gradient-based updates with configurable frequency.
+class FrequencyUpdate(UpdatableComponent):
+    """Base class for components that require updates with configurable frequency.
 
-    This class provides a foundation for updatable components in reinforcement learning algorithms
-    that use torch optimizers and require updates at specific frequencies. It handles update timing,
-    gradient manipulation, update counting, and logging. Derived classes need only implement the
-    calculate_loss() method to specify the specific loss computation for their algorithm.
+    This class provides a foundation for updatable components in reinforcement learning algorithms. It handles update timing, update counting, and logging.
+    Derived classes need only implement the
+    _update() method to specify the update behavior.
     """
 
     def __init__(
         self,
-        optimizer: Optimizer,
         log_tag: str,
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
-        gradient_max_norm: float = None,
     ) -> None:
-        """Initializes the TorchFrequentGradientUpdate class with the given parameters.
+        """Initializes the FrequencyUpdate class with the given parameters.
 
         Args:
-            optimizer (Optimizer): The optimizer to be used for the update.
             log_tag (str): The tag used for logging the resulting loss
             update_frequency (int, optional): The frequency of the update according to the number of environment interactions.
             If the update frequency is -1, updates will only be performed at the end of an episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to be performed when the update condition is met. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
-            gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is performed. Defaults to None.
         """
         UpdatableComponent.__init__(self)
 
-        self.optimizer = optimizer
         self.update_frequency = update_frequency
         self.log_tag = log_tag
         self.number_of_updates = number_of_updates
         self.multiply_number_of_updates_by_environment_steps = (
             multiply_number_of_updates_by_environment_steps
         )
-
-        if gradient_max_norm:
-            self.gradient_manipulation_function = (
-                lambda: torch.nn.utils.clip_grad_norm_(
-                    parameters=[
-                        parameter
-                        for group in self.optimizer.param_groups
-                        for parameter in group["params"]
-                    ],
-                    max_norm=gradient_max_norm,
-                )
-            )
-        else:
-            self.gradient_manipulation_function = lambda: None
 
         self.step_tracker = StepTracker.get_instance()
         self._last_interaction_updated_on_tracker_id = (
@@ -119,14 +99,9 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
 
         for _ in range(number_of_updates):
 
-            loss = self.calculate_loss()
+            loss = self._update()
 
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.gradient_manipulation_function()
-            self.optimizer.step()
-
-            losses.append(loss.item())
+            losses.append(loss)
 
         log_data = {self.log_tag: np.mean(losses).item()}
         log_data.update(self.post_update_routine())
@@ -144,15 +119,15 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
         return {}
 
     @abstractmethod
-    def calculate_loss(
+    def _update(
         self,
-    ) -> torch.Tensor:
+    ) -> np.ndarray:
         """Abstract method to be implemented in the derived class. This function should
-        calculate the loss to be used for the update. All necessary dependencies should be provided
+        perform the actual update. All necessary dependencies should be provided
         in the constructor of the derived class such that no arguments are needed.
 
         Returns:
-            torch.Tensor: The calculated loss tensor as a scalar.
+            np.ndarray: The calculated loss tensor as a scalar.
         """
         ...
 
@@ -192,6 +167,84 @@ class TorchFrequentGradientUpdate(UpdatableComponent):
                 id=self._last_interaction_updated_on_tracker_id
             )
         )
+
+
+class TorchFrequentGradientUpdate(FrequencyUpdate):
+    """Base class for components that require gradient-based updates with configurable frequency.
+
+    This class provides a foundation for updatable components in reinforcement learning algorithms
+    that use torch optimizers and require updates at specific frequencies. It handles update timing,
+    gradient manipulation, update counting, and logging. Derived classes need only implement the
+    calculate_loss() method to specify the specific loss computation for their algorithm.
+    """
+
+    def __init__(
+        self,
+        optimizer: Optimizer,
+        log_tag: str,
+        update_frequency: int = 1,
+        number_of_updates: int = 1,
+        multiply_number_of_updates_by_environment_steps: bool = False,
+        gradient_max_norm: float = None,
+    ) -> None:
+        """Initializes the TorchFrequentGradientUpdate class with the given parameters.
+
+        Args:
+            optimizer (Optimizer): The optimizer to be used for the update.
+            log_tag (str): The tag used for logging the resulting loss
+            update_frequency (int, optional): The frequency of the update according to the number of environment interactions.
+            If the update frequency is -1, updates will only be performed at the end of an episode. Defaults to 1.
+            number_of_updates (int, optional): The number of updates to be performed when the update condition is met. Defaults to 1.
+            multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
+            gradient_max_norm (float, optional): The maximum norm for the gradients. If None, no gradient clipping is performed. Defaults to None.
+        """
+        super().__init__(
+            log_tag=log_tag,
+            update_frequency=update_frequency,
+            number_of_updates=number_of_updates,
+            multiply_number_of_updates_by_environment_steps=(
+                multiply_number_of_updates_by_environment_steps
+            ),
+        )
+
+        self.optimizer = optimizer
+
+        if gradient_max_norm:
+            self.gradient_manipulation_function = (
+                lambda: torch.nn.utils.clip_grad_norm_(
+                    parameters=[
+                        parameter
+                        for group in self.optimizer.param_groups
+                        for parameter in group["params"]
+                    ],
+                    max_norm=gradient_max_norm,
+                )
+            )
+        else:
+            self.gradient_manipulation_function = lambda: None
+
+    def _update(self) -> np.ndarray:
+        loss = self.calculate_loss()
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.gradient_manipulation_function()
+        self.optimizer.step()
+
+        return loss.item()
+
+    @abstractmethod
+    def calculate_loss(
+        self,
+    ) -> torch.Tensor:
+        """Abstract method to be implemented in the derived class. This function should
+        calculate the loss to be used for the update. All necessary dependencies should be provided
+        in the constructor of the derived class such that no arguments are needed.
+
+        Returns:
+            torch.Tensor: The calculated loss tensor as a scalar.
+        """
+        ...
 
 
 class TorchTargetNetUpdate(UpdatableComponent):

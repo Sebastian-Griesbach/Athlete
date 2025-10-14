@@ -15,7 +15,7 @@ from athlete import constants
 # Mapping most ints to int64 because torch can only perform indexing with int64
 # Mapping int8 to int8 because we assume this is only used if you want to save memory
 # By default bools are to integers, this mapping maps booleans to booleans
-DTYPE_MAP = {
+TORCH_DTYPE_MAP = {
     "float16": torch.float32,
     "float32": torch.float32,
     "float64": torch.float32,
@@ -27,8 +27,20 @@ DTYPE_MAP = {
     "bool": torch.bool,
 }
 
+JAX_DTYPE_MAP = {
+    "float16": jnp.float32,
+    "float32": jnp.float32,
+    "float64": jnp.float32,
+    "int8": jnp.int32,
+    "int16": jnp.int32,
+    "int32": jnp.int32,
+    "int64": jnp.int32,
+    "uint8": jnp.uint8,
+    "bool": jnp.bool_,
+}
 
-def numpy_to_tensor(np_array: np.ndarray, device: str = "cpu") -> torch.Tensor:
+
+def numpy_to_torch_tensor(np_array: np.ndarray, device: str = "cpu") -> torch.Tensor:
     """Transforms a numpy array to a torch tensor following a specific dtype mapping.
 
     Args:
@@ -38,13 +50,13 @@ def numpy_to_tensor(np_array: np.ndarray, device: str = "cpu") -> torch.Tensor:
     Returns:
         torch.Tensor: Transformed torch tensor.
     """
-    dtype = DTYPE_MAP.get(np_array.dtype.name, torch.float32)
+    dtype = TORCH_DTYPE_MAP.get(np_array.dtype.name, torch.float32)
     return (
         torch.from_numpy(np_array).to(device=device, dtype=dtype).requires_grad_(False)
     )
 
 
-def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
+def torch_tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     """Safely transforms a torch tensor to a numpy array. Uses default dtype mapping from numpy.
 
     Args:
@@ -54,6 +66,31 @@ def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
         np.ndarray: Transformed numpy array.
     """
     return tensor.detach().cpu().numpy()
+
+
+def numpy_to_jax_array(np_array: np.ndarray) -> jnp.ndarray:
+    """Transforms a numpy array to a jax array following a specific dtype mapping.
+
+    Args:
+        np_array (np.ndarray): Numpy array to be transformed.
+
+    Returns:
+        jnp.ndarray: Transformed jax array.
+    """
+    dtype = JAX_DTYPE_MAP.get(np_array.dtype.name, jnp.float32)
+    return jnp.array(np_array, dtype=dtype)
+
+
+def jax_array_to_numpy(array: jnp.ndarray) -> np.ndarray:
+    """Safely transforms a jax array to a numpy array. Uses default dtype mapping from numpy.
+
+    Args:
+        array (jnp.ndarray): Jax array to be transformed.
+
+    Returns:
+        np.ndarray: Transformed numpy array.
+    """
+    return np.array(jax.device_get(array))
 
 
 def gymnasium_value_to_batched_numpy_array(value: Union[int, np.ndarray]) -> np.ndarray:
@@ -132,7 +169,7 @@ def extract_data_from_batch(
         zip(
             keys,
             map(
-                lambda data: numpy_to_tensor(data, device=device),
+                lambda data: numpy_to_torch_tensor(data, device=device),
                 single_safe_itemgetter(keys)(data_batch),
             ),
         )
@@ -141,7 +178,7 @@ def extract_data_from_batch(
 
 def jax_extract_data_from_batch(
     data_batch: Dict[str, np.ndarray], keys: List[str]
-) -> Dict[str, torch.Tensor]:
+) -> Dict[str, np.ndarray]:
     """Extracts data from a batch.
 
     Args:
@@ -151,12 +188,17 @@ def jax_extract_data_from_batch(
     Returns:
         Dict[str, torch.Tensor]: Extracted data.
     """
-    return dict(
-        zip(
-            keys,
-            single_safe_itemgetter(keys)(data_batch),
-        )
-    )
+    # Seems to be faster if we just do the conversion implicitly, might cause trouble with specific dtypes
+    # return dict(
+    #     zip(
+    #         keys,
+    #         map(
+    #             lambda data: numpy_to_jax_array(data),
+    #             single_safe_itemgetter(keys)(data_batch),
+    #         ),
+    #     )
+    # )
+    return dict(zip(keys, single_safe_itemgetter(keys)(data_batch)))
 
 
 def create_transition_data_info(

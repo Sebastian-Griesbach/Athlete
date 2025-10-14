@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from gymnasium.spaces import Box
 
-from athlete.function import numpy_to_tensor, tensor_to_numpy
+from athlete.function import numpy_to_torch_tensor, torch_tensor_to_numpy
 from athlete.policy.policy import Policy
 from athlete.algorithms.ppo.module import PPOActor
 
@@ -45,11 +45,11 @@ class PPOTrainingPolicy(Policy):
             Tuple[int, Dict[str, Any]]: A tuple containing the sampled action and a dictionary containing the log probability of the action.
         """
         observation = np.expand_dims(observation, axis=0)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             action, log_prob = self.actor.get_action_and_log_prob(observation)
-        action = tensor_to_numpy(action).squeeze(axis=0)
-        log_prob = tensor_to_numpy(log_prob).squeeze(axis=0)
+        action = torch_tensor_to_numpy(action).squeeze(axis=0)
+        log_prob = torch_tensor_to_numpy(log_prob).squeeze(axis=0)
 
         return action, {INFO_KEY_LOG_PROB: log_prob}
 
@@ -88,9 +88,9 @@ class PPOEvaluationPolicy(Policy):
             Tuple[int, Dict[str, Any]]: A tuple containing the deterministic action mean and an empty dictionary.
         """
         observation = np.expand_dims(observation, axis=0)
-        observation = numpy_to_tensor(observation, device=self.module_device)
+        observation = numpy_to_torch_tensor(observation, device=self.module_device)
         with torch.no_grad():
             action = self.actor.get_mean(observation)
-        action = tensor_to_numpy(action).squeeze(axis=0)
+        action = torch_tensor_to_numpy(action).squeeze(axis=0)
 
         return action, {}
