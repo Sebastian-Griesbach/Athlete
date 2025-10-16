@@ -52,7 +52,9 @@ def numpy_to_torch_tensor(np_array: np.ndarray, device: str = "cpu") -> torch.Te
     """
     dtype = TORCH_DTYPE_MAP.get(np_array.dtype.name, torch.float32)
     return (
-        torch.from_numpy(np_array).to(device=device, dtype=dtype).requires_grad_(False)
+        torch.from_numpy(np_array)
+        .to(device=device, dtype=dtype, non_blocking=True)
+        .requires_grad_(False)
     )
 
 
