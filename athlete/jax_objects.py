@@ -11,8 +11,8 @@ class ModuleState(flax.struct.PyTreeNode):
     apply_fn: Callable = flax.struct.field(pytree_node=False)
     params: flax.core.FrozenDict[str, Any] = flax.struct.field(pytree_node=True)
 
-    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
-        return self.apply_fn(self.params, x)
+    def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
+        return self.apply_fn(self.params, x, *args, **kwargs)
 
 
 class OptimizerState(flax.struct.PyTreeNode):

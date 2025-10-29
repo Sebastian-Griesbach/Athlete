@@ -41,7 +41,6 @@ ARGUMENT_TARGET_NET_TAU = "target_net_tau"
 ARGUMENT_ENABLE_DOUBLE_Q_LEARNING = "enable_double_q_learning"
 ARGUMENT_CRITERIA = "criteria"
 ARGUMENT_GRADIENT_MAX_NORM = "gradient_max_norm"
-ARGUMENT_DEVICE = "device"
 ARGUMENT_ADDITIONAL_REPLAY_BUFFER_ARGUMENTS = "additional_replay_buffer_arguments"
 ARGUMENT_POST_REPLAY_BUFFER_DATA_PREPROCESSING = "post_replay_buffer_data_preprocessing"
 ARGUMENT_OBSERVATION_SHAPE = "observation_shape"
@@ -114,13 +113,8 @@ def make_jax_dqn_components(
         **configuration[ARGUMENT_VALUE_NETWORK_ARGUMENTS]
     )
 
+    # DATA PROVIDER
     update_data_input = UpdateDataProvider()
-
-    # Put a function wrapper around the criteria
-    if not isinstance(configuration[ARGUMENT_CRITERIA], FunctionWrapper):
-        configuration[ARGUMENT_CRITERIA] = FunctionWrapper(
-            function=configuration[ARGUMENT_CRITERIA]
-        )
 
     # DATA COLLECTOR
 
