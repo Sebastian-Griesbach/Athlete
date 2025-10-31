@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Dict, Any, Optional
 from abc import abstractmethod
 
@@ -330,10 +331,12 @@ class JAXTargetNetUpdate(UpdatableComponent):
         mutable_q_value_function: MutableJaxModule,
         tau: float = 1.0,
         update_frequency: int = 1,
+        update_variables: bool = False,
     ) -> None:
         self.mutable_target_net = mutable_target_net
         self.mutable_q_value_function = mutable_q_value_function
         self.tau = tau
+        self.update_variables = update_variables
 
         self.step_tracker = StepTracker.get_instance()
         self._last_interaction_updated_on_tracker_id = (
@@ -348,23 +351,34 @@ class JAXTargetNetUpdate(UpdatableComponent):
             target_net=self.mutable_target_net.get(),
             q_value_function=self.mutable_q_value_function.get(),
             tau=self.tau,
+            update_variables=self.update_variables,
         )
         self.mutable_target_net.set(new_target_net)
 
         return {}
 
-    @jax.jit
+    @partial(jax.jit, static_argnames=["update_variables"])
     def _jitable_update(
         target_net: ModuleState,
         q_value_function: ModuleState,
         tau: float = 1.0,
+        update_variables: bool = False,
     ) -> ModuleState:
-        new_target_net_parameters = optax.incremental_update(
+        if update_variables:
+            new_target_net_variables = optax.incremental_update(
+                new_tensors=q_value_function.variables,
+                old_tensors=target_net.variables,
+                step_size=tau,
+            )
+            return target_net.replace(variables=new_target_net_variables)
+
+        # Only update learnable parameters
+        new_target_net_variables = optax.incremental_update(
             new_tensors=q_value_function.params,
             old_tensors=target_net.params,
             step_size=tau,
         )
-        return target_net.replace(params=new_target_net_parameters)
+        return target_net.replace(variables=new_target_net_variables)
 
     @property
     def update_condition(self) -> bool:

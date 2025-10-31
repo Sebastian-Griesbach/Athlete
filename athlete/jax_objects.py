@@ -9,10 +9,14 @@ from jax import numpy as jnp
 
 class ModuleState(flax.struct.PyTreeNode):
     apply_fn: Callable = flax.struct.field(pytree_node=False)
-    params: flax.core.FrozenDict[str, Any] = flax.struct.field(pytree_node=True)
+    variables: flax.core.FrozenDict[str, Any] = flax.struct.field(pytree_node=True)
+
+    @property
+    def params(self) -> flax.core.FrozenDict[str, Any]:
+        return {"params": self.variables["params"]}
 
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
-        return self.apply_fn(self.params, x, *args, **kwargs)
+        return self.apply_fn(self.variables, x, *args, **kwargs)
 
 
 class OptimizerState(flax.struct.PyTreeNode):
