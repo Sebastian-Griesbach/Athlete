@@ -34,7 +34,7 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
         discount: float = 0.99,
-        criteria: FunctionWrapper = FunctionWrapper(function=jax_mse_loss),
+        criteria: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray] = jax_mse_loss,
         log_tag: str = LOG_TAG_LOSS,
     ) -> None:
 
@@ -107,20 +107,20 @@ class JAXDQNValueUpdate(FrequencyUpdate):
 
         # create new q_value_function and optimizer
         new_q_value_function = q_value_function.replace(
-            params=new_q_value_function_parameters
+            variables=new_q_value_function_parameters
         )
         new_optimizer = optimizer.replace(opt_state=new_optimizer_state)
 
         return loss, new_q_value_function, new_optimizer
 
-    @jax.jit
+    @partial(jax.jit, static_argnames=["criteria"])
     def _calculate_loss(
         q_value_function_parameters: flax.core.FrozenDict,
         q_value_function: ModuleState,
         observations: jnp.ndarray,
         actions: jnp.ndarray,
         target: jnp.ndarray,
-        criteria: FunctionWrapper,
+        criteria: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     ) -> jnp.ndarray:
         # calculate predictions
         raw_q_values = q_value_function.apply_fn(

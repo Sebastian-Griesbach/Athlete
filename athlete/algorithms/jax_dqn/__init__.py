@@ -128,7 +128,7 @@ def make_jax_dqn_components(
     initial_q_value_function_parameters = value_function.init(random_key, dummy_input)
     immutable_q_value_function = ModuleState(
         apply_fn=value_function.apply,
-        params=initial_q_value_function_parameters,
+        variables=initial_q_value_function_parameters,
     )
     mutable_q_value_function = MutableJaxModule(
         module=immutable_q_value_function,
