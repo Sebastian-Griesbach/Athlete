@@ -1,6 +1,6 @@
 # Athlete
 
-An API for interacting with reinforcement learning agents which closes the RL loop with [Gymnasium](https://github.com/Farama-Foundation/Gymnasium).
+An API for interacting with reinforcement learning agents which acts as the counterpart to [Gymnasium](https://github.com/Farama-Foundation/Gymnasium).
 
 Athlete provides a similar interface for reinforcement learning agents as Gymnasium does for environments. As such it enables the handling of RL agents while being agnostic towards the underlying RL algorithm. The following shows a minimal training loop using Athlete.
 
