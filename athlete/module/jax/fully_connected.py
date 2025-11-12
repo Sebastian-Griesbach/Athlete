@@ -5,12 +5,12 @@ import jax.numpy as jnp
 import flax.linen as nn
 
 
-def make_bias_init(fan_in):
-    def bias_init(key, shape, dtype=jnp.float32):
-        limit = 1.0 / jnp.sqrt(fan_in)
-        return jax.random.uniform(key, shape, dtype, minval=-limit, maxval=limit)
+# def make_bias_init(fan_in):
+#     def bias_init(key, shape, dtype=jnp.float32):
+#         limit = 1.0 / jnp.sqrt(fan_in)
+#         return jax.random.uniform(key, shape, dtype, minval=-limit, maxval=limit)
 
-    return bias_init
+#     return bias_init
 
 
 class FlaxNonLinearFullyConnectedNet(nn.Module):
@@ -22,7 +22,7 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     final_activation: Optional[Callable] = None
     initial_activation: Optional[Callable] = None
     # Same default initialization as in Pytorch
-    weight_init: Callable = nn.initializers.lecun_uniform()
+    weight_init: Callable = None
     bias_init: Callable = None
 
     def setup(self):
@@ -34,9 +34,13 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
         self.layers = [
             nn.Dense(
                 features=self.layer_dims[i + 1],
-                kernel_init=self.weight_init,
+                kernel_init=(
+                    nn.initializers.lecun_uniform()
+                    if self.weight_init is None
+                    else self.weight_init
+                ),
                 bias_init=(
-                    make_bias_init(fan_in=self.layer_dims[i])
+                    nn.initializers.uniform(scale=1 / jnp.sqrt(self.layer_dims[i]))
                     if self.bias_init is None
                     else self.bias_init
                 ),
