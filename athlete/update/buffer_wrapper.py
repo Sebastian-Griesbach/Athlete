@@ -78,10 +78,14 @@ class InputOutputWrapper(BufferWrapper):
             self._data_info = data_info
 
     def add(
-        self, transition_dictionary: Dict[str, np.ndarray], episode_ended: np.ndarray
+        self,
+        data_dictionary: Dict[str, np.ndarray],
+        metadata: Optional[Dict[str, any]] = None,
     ) -> None:
-        transformed = self.in_transform(data_dictionary=transition_dictionary)
-        self.replay_buffer.add(data_dictionary=transformed, episode_ended=episode_ended)
+        transformed = self.in_transform(
+            data_dictionary=data_dictionary, metadata=metadata
+        )
+        self.replay_buffer.add(data_dictionary=transformed, metadata=metadata)
         self.post_add_routine()
 
     def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
@@ -89,7 +93,11 @@ class InputOutputWrapper(BufferWrapper):
         transformed = self.out_transform(data_dictionary=raw_sample)
         return transformed
 
-    def in_transform(self, data_dictionary: Dict[str, Any]) -> Dict[str, Any]:
+    def in_transform(
+        self,
+        data_dictionary: Dict[str, Any],
+        metadata: Optional[Dict[str, any]] = None,
+    ) -> Dict[str, Any]:
         """Overwrite this function to transform the data before adding it to the buffer.
 
         Args:
