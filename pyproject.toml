@@ -31,4 +31,5 @@ Homepage = "https://github.com/Sebastian-Griesbach/athlete"
 Repository = "https://github.com/Sebastian-Griesbach/athlete"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["athlete*"]
