@@ -47,6 +47,14 @@ class UpdateDataProvider:
         self.new_data_available = False
         return self.update_data, self.metadata
 
+    def peek_data(self) -> Tuple[Any, Dict[str, Any]]:
+        """Peek at the current data and metadata without marking it as consumed.
+
+        Returns:
+            Tuple[Any, Dict[str, Any]]: The current data and metadata held in the provider.
+        """
+        return self.update_data, self.metadata
+
     def has_new_data(self) -> bool:
         """Check if there is new data available in the provider.
 

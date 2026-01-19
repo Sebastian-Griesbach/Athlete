@@ -30,6 +30,7 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         mutable_optimizer: MutableOptaxOptimizer,
         data_sampler: Callable[[None], Dict[str, np.ndarray]],
         cross_validation: bool = False,
+        minto: bool = False,  # TODO surface this option to the init, or remove it
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
@@ -60,8 +61,9 @@ class JAXDQNValueUpdate(FrequencyUpdate):
                 else JAXDQNValueUpdate._calculate_target
             )
         )
+        self.minto = minto
 
-    @partial(jax.jit, static_argnames=["criteria", "target_calculation"])
+    @partial(jax.jit, static_argnames=["criteria", "target_calculation", "minto"])
     def _jitable_update(
         q_value_function: ModuleState,
         target_net: ModuleState,
@@ -74,14 +76,21 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         discount: float,
         criteria: FunctionWrapper,
         target_calculation: FunctionWrapper,
+        minto: bool,
     ) -> Tuple[jnp.ndarray, optax.OptState, flax.core.FrozenDict]:
+
+        raw_next_q_values = target_net(next_observations)
+
+        if minto:
+            online_raw_next_q_values = q_value_function(next_observations)
+            raw_next_q_values = jnp.minimum(raw_next_q_values, online_raw_next_q_values)
 
         # calculate target
         target = target_calculation(
             rewards=rewards,
             next_observations=next_observations,
             terminateds=terminateds,
-            target_net=target_net,
+            raw_next_q_values=raw_next_q_values,
             discount=discount,
             q_value_function=q_value_function,
         )
@@ -137,11 +146,10 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         rewards: jnp.ndarray,
         next_observations: jnp.ndarray,
         terminateds: jnp.ndarray,
-        target_net: ModuleState,
+        raw_next_q_values: jnp.ndarray,
         discount: float,
         q_value_function: ModuleState,  # Not needed only here to have same signature as cross validation
     ) -> jnp.ndarray:
-        raw_next_q_values = target_net(next_observations)
         next_q_values = jnp.max(raw_next_q_values, axis=1, keepdims=True)
         not_terminateds = jnp.logical_not(terminateds)
         target = rewards + not_terminateds * discount * next_q_values
@@ -152,16 +160,14 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         rewards: jnp.ndarray,
         next_observations: jnp.ndarray,
         terminateds: jnp.ndarray,
-        target_net: ModuleState,
+        raw_next_q_values: jnp.ndarray,
         discount: float,
         q_value_function: ModuleState,
     ) -> jnp.ndarray:
         next_actions = jnp.argmax(
             q_value_function(next_observations), axis=1, keepdims=True
         )
-        next_q_values = jnp.take_along_axis(
-            target_net(next_observations), next_actions, axis=1
-        )
+        next_q_values = jnp.take_along_axis(raw_next_q_values, next_actions, axis=1)
         not_terminateds = jnp.logical_not(terminateds)
         target = rewards + not_terminateds * discount * next_q_values
         return target
@@ -186,6 +192,7 @@ class JAXDQNValueUpdate(FrequencyUpdate):
             discount=self.discount,
             criteria=self.criteria,
             target_calculation=self.target_calculation,
+            minto=self.minto,
         )
 
         # update parameters and optimizer state
