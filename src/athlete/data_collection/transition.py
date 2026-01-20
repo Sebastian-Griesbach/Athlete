@@ -144,7 +144,9 @@ class GymnasiumTransitionDataCollector(DataCollector):
 
         self.episode_ended = terminated or truncated
         metadata = {
-            constants.METADATA_EPISODE_ENDED: np.array([self.episode_ended]),
+            constants.METADATA_EPISODE_ENDED: np.array(
+                [self.episode_ended]
+            ).flatten()  # truncated has a different shape then terminated, resulting shape in numpy depends on shapes of bool inputs, flatten ensures consistency (nasty bug to find),
         }
         self.update_data_provider.set_data(update_data=transition, metadata=metadata)
 
