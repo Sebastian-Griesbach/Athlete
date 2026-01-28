@@ -453,7 +453,6 @@ class EpisodicCPPReplayBuffer(Buffer):
 
         # load all other splits
         for split in remaining_splits:
-            data = {}
             split_transitions = file_handler.load_from_file(
                 load_path=os.path.join(
                     load_path,
@@ -469,8 +468,7 @@ class EpisodicCPPReplayBuffer(Buffer):
                 ],
             )
             added_so_far += split_size
-
-            del data
+            del split_transitions
             gc.collect()
 
         # add last bit of first split
