@@ -8,6 +8,7 @@ import numpy as np
 import optax
 import numpy as np
 import jax
+from flax.core import FrozenDict
 
 from athlete.update.update_rule import UpdatableComponent
 from athlete.data_collection.provider import UpdateDataProvider
@@ -370,15 +371,18 @@ class JAXTargetNetUpdate(UpdatableComponent):
                 old_tensors=target_net.variables,
                 step_size=tau,
             )
-            return target_net.replace(variables=new_target_net_variables)
+            return target_net.replace(variables=FrozenDict(new_target_net_variables))
 
         # Only update learnable parameters
-        new_target_net_variables = optax.incremental_update(
+        new_target_net_params = optax.incremental_update(
             new_tensors=q_value_function.params,
             old_tensors=target_net.params,
             step_size=tau,
         )
-        return target_net.replace(variables=new_target_net_variables)
+        full_variables = q_value_function.variables.copy(
+            add_or_replace=new_target_net_params
+        )
+        return target_net.replace(variables=FrozenDict(full_variables))
 
     @property
     def update_condition(self) -> bool:

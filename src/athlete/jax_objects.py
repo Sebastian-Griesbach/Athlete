@@ -5,6 +5,7 @@ import flax.struct
 import optax
 
 from jax import numpy as jnp
+from flax.core import FrozenDict
 
 
 class ModuleState(flax.struct.PyTreeNode):
@@ -13,7 +14,7 @@ class ModuleState(flax.struct.PyTreeNode):
 
     @property
     def params(self) -> flax.core.FrozenDict[str, Any]:
-        return {"params": self.variables["params"]}
+        return FrozenDict({"params": self.variables["params"]})
 
     def __call__(self, x: jnp.ndarray, *args, **kwargs) -> jnp.ndarray:
         return self.apply_fn(self.variables, x, *args, **kwargs)
