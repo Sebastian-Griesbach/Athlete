@@ -19,15 +19,14 @@ class BufferWrapper(Buffer):
         """
         self.replay_buffer = replay_buffer
 
-    def add(
-        self, transition_dictionary: Dict[str, np.ndarray], episode_ended: np.ndarray
-    ) -> None:
-        self.replay_buffer.add(
-            data_dictionary=transition_dictionary, episode_ended=episode_ended
-        )
+    def add(self, data_dictionary: Dict[str, np.ndarray], metadata: np.ndarray) -> None:
+        self.replay_buffer.add(data_dictionary=data_dictionary, metadata=metadata)
 
     def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
         return self.replay_buffer.sample(batch_size=batch_size)
+
+    def sample_ids(self, batch_size: int) -> List[int]:
+        return self.replay_buffer.sample_ids(batch_size=batch_size)
 
     def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
         return self.replay_buffer.encode_sample(sample_ids)
@@ -88,8 +87,8 @@ class InputOutputWrapper(BufferWrapper):
         self.replay_buffer.add(data_dictionary=transformed, metadata=metadata)
         self.post_add_routine()
 
-    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
-        raw_sample = self.replay_buffer.sample(batch_size=batch_size)
+    def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
+        raw_sample = self.replay_buffer.encode_sample(sample_ids=sample_ids)
         transformed = self.out_transform(data_dictionary=raw_sample)
         return transformed
 

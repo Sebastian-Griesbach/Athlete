@@ -233,6 +233,7 @@ class SaverRegistry:
         Raises:
             TypeError: If no registered saver is found for the object's type
         """
+        # TODO make this a dictionary lookup instead of iterating through all savers
         for data_type, saver_fn in cls._savers.items():
             if isinstance(obj, data_type):
                 saver_fn(obj, context, filename)

@@ -25,6 +25,15 @@ class Buffer(ABC):
     def __init__(self) -> None:
         super().__init__()
 
+    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+        """Sample data from the replay buffer.
+
+        Args:
+            batch_size (int): Number of entries to return.
+        """
+        sample_ids = self.sample_ids(batch_size=batch_size)
+        return self.encode_sample(sample_ids)
+
     @abstractmethod
     def add(
         self,
@@ -41,8 +50,8 @@ class Buffer(ABC):
         ...
 
     @abstractmethod
-    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
-        """Sample data from the replay buffer.
+    def sample_ids(self, batch_size: int) -> List[int]:
+        """Sample ids from the replay buffer.
 
         Args:
             batch_size (int): Number of entries to return.
@@ -172,8 +181,7 @@ class EpisodicCPPReplayBuffer(Buffer):
 
         self.last_added_end_position = added_end_position
 
-    def sample(self, batch_size: int):
-
+    def sample_ids(self, batch_size: int) -> List[int]:
         stored_size = self.size
         if stored_size < batch_size:
             # with replacement
@@ -185,8 +193,7 @@ class EpisodicCPPReplayBuffer(Buffer):
             sample_ids = self.random_numbers_generator.choice(
                 stored_size, size=batch_size, replace=False
             )
-
-        return self.encode_sample(sample_ids)
+        return sample_ids
 
     def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
         return self.replay_buffer._encode_sample(sample_ids)
@@ -309,7 +316,7 @@ class EpisodicCPPReplayBuffer(Buffer):
 
     @property
     def pointer_position(self):
-        return self.last_added_end_position
+        return self.replay_buffer.get_next_index()
 
     def _save_split_replay_buffer(
         self, file_handler, save_path, prefix, number_of_splits, split_size
