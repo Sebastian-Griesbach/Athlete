@@ -31,8 +31,7 @@ class Buffer(ABC):
         Args:
             batch_size (int): Number of entries to return.
         """
-        sample_ids = self.sample_ids(batch_size=batch_size)
-        return self.encode_sample(sample_ids)
+        ...
 
     @abstractmethod
     def add(
@@ -180,6 +179,15 @@ class EpisodicCPPReplayBuffer(Buffer):
             self.buffer_episode_ended[:added_end_position] = episode_ended[split:]
 
         self.last_added_end_position = added_end_position
+
+    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+        """Sample data from the replay buffer.
+
+        Args:
+            batch_size (int): Number of entries to return.
+        """
+        sample_ids = self.sample_ids(batch_size=batch_size)
+        return self.encode_sample(sample_ids)
 
     def sample_ids(self, batch_size: int) -> List[int]:
         stored_size = self.size

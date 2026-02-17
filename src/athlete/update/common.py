@@ -38,6 +38,7 @@ class FrequencyUpdate(UpdatableComponent):
         update_frequency: int = 1,
         number_of_updates: int = 1,
         multiply_number_of_updates_by_environment_steps: bool = False,
+        only_update_if_data_is_not_empty: bool = True,
     ) -> None:
         """Initializes the FrequencyUpdate class with the given parameters.
 
@@ -47,12 +48,14 @@ class FrequencyUpdate(UpdatableComponent):
             If the update frequency is -1, updates will only be performed at the end of an episode. Defaults to 1.
             number_of_updates (int, optional): The number of updates to be performed when the update condition is met. Defaults to 1.
             multiply_number_of_updates_by_environment_steps (bool, optional): Whether to multiply the number of updates by the number of environment steps since the last update. Defaults to False.
+            only_update_if_data_is_not_empty (bool, optional): Whether to only update if there is already at least one data point. Defaults to True.
         """
         UpdatableComponent.__init__(self)
 
         self.update_frequency = update_frequency
         self.log_tag = log_tag
         self.number_of_updates = number_of_updates
+        self.only_update_if_data_is_not_empty = only_update_if_data_is_not_empty
         self.multiply_number_of_updates_by_environment_steps = (
             multiply_number_of_updates_by_environment_steps
         )
@@ -135,6 +138,14 @@ class FrequencyUpdate(UpdatableComponent):
 
     @property
     def update_condition(self) -> bool:
+        # There exist any datapoint
+        if (
+            self.only_update_if_data_is_not_empty
+            and self.step_tracker.get_tracker_value(id=constants.TRACKER_DATA_POINTS)
+            == 0
+        ):
+            return False
+
         if self.update_frequency > 0:
             # Update if training frequency is met
             return (

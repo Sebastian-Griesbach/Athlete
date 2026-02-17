@@ -87,8 +87,8 @@ class InputOutputWrapper(BufferWrapper):
         self.replay_buffer.add(data_dictionary=transformed, metadata=metadata)
         self.post_add_routine()
 
-    def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
-        raw_sample = self.replay_buffer.encode_sample(sample_ids=sample_ids)
+    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+        raw_sample = self.replay_buffer.sample(batch_size=batch_size)
         transformed = self.out_transform(data_dictionary=raw_sample)
         return transformed
 
