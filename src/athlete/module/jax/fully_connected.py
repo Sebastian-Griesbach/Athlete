@@ -5,32 +5,54 @@ import jax.numpy as jnp
 import flax.linen as nn
 
 
-# def make_bias_init(fan_in):
-#     def bias_init(key, shape, dtype=jnp.float32):
-#         limit = 1.0 / jnp.sqrt(fan_in)
-#         return jax.random.uniform(key, shape, dtype, minval=-limit, maxval=limit)
-
-#     return bias_init
-
-
 class FlaxNonLinearFullyConnectedNet(nn.Module):
-    """A flexible fully connected neural network in Flax."""
+    """A flexible fully connected neural network in Flax.
+
+    This module creates a multi-layer perceptron with configurable layer dimensions,
+    activations, and optional layer normalization.
+
+    Attributes:
+        layer_dims: Tuple of layer dimensions (input_dim, hidden1, hidden2, ..., output_dim).
+        activation: Activation function applied after each hidden layer. Default: nn.relu.
+        final_activation: Optional activation applied to the output layer. Default: None.
+        initial_activation: Optional activation applied to the input. Default: None.
+        weight_init: Kernel initializer for Dense layers. Default: lecun_uniform.
+        bias_init: Bias initializer for Dense layers. Default: uniform with scale=1/sqrt(fan_in).
+        use_layer_norm: Whether to apply LayerNorm after each hidden layer. Default: False.
+        layer_norm_epsilon: Epsilon for LayerNorm numerical stability. Default: 1e-6.
+
+    Example:
+        >>> net = FlaxNonLinearFullyConnectedNet(
+        ...     layer_dims=(128, 256, 256, 64),
+        ...     activation=nn.relu,
+        ...     use_layer_norm=True
+        ... )
+        >>> params = net.init(key, jnp.ones((1, 128)))
+        >>> output = net.apply(params, x)
+
+    Layer ordering for hidden layers:
+        Dense → LayerNorm (if enabled) → Activation
+
+    Output layer:
+        Dense → final_activation (if provided)
+    """
 
     # Configuration attributes
     layer_dims: Tuple[int, ...]
     activation: Callable = nn.relu
     final_activation: Optional[Callable] = None
     initial_activation: Optional[Callable] = None
-    # Same default initialization as in Pytorch
     weight_init: Callable = None
     bias_init: Callable = None
+    use_layer_norm: bool = False
+    layer_norm_epsilon: float = 1e-6
 
     def setup(self):
         """Set up the layers of the network."""
         # Number of Linear layers in the network
         num_linear_layers = len(self.layer_dims) - 1
 
-        # List will be converted into a tuple by Flax
+        # Create Dense layers - list will be converted into a tuple by Flax
         self.layers = [
             nn.Dense(
                 features=self.layer_dims[i + 1],
@@ -49,12 +71,18 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
             for i in range(num_linear_layers)
         ]
 
+        # Create LayerNorm layers for hidden layers only (not output layer)
+        if self.use_layer_norm:
+            self.layer_norms = [
+                nn.LayerNorm(epsilon=self.layer_norm_epsilon, name=f"layer_norm_{i+1}")
+                for i in range(num_linear_layers - 1)
+            ]
+
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         """Forward pass through the network.
 
         Args:
-            x: Input tensor to the network
-            training: Whether we're in training mode (for dropout, etc.)
+            x: Input tensor to the network of shape (batch_size, input_dim)
 
         Returns:
             Output tensor after passing through the network
@@ -63,13 +91,16 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
         if self.initial_activation is not None:
             x = self.initial_activation(x)
 
-        # Apply layers and activations
+        # Apply layers with optional layer normalization
         num_layers = len(self.layers)
         for i, layer in enumerate(self.layers):
+            # Apply Dense layer
             x = layer(x)
 
-            # Add activation except after the final layer
+            # For hidden layers: apply LayerNorm (if enabled) then activation
             if i < num_layers - 1:
+                if self.use_layer_norm:
+                    x = self.layer_norms[i](x)
                 x = self.activation(x)
 
         # Apply final activation if provided
