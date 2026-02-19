@@ -22,16 +22,18 @@ class BufferWrapper(Buffer):
     def add(
         self, data_dictionary: Dict[str, np.ndarray], metadata: np.ndarray, **kwargs
     ) -> None:
-        self.replay_buffer.add(data_dictionary=data_dictionary, metadata=metadata)
+        self.replay_buffer.add(
+            data_dictionary=data_dictionary, metadata=metadata, **kwargs
+        )
 
     def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
-        return self.replay_buffer.sample(batch_size=batch_size)
+        return self.replay_buffer.sample(batch_size=batch_size, **kwargs)
 
     def sample_ids(self, batch_size: int, **kwargs) -> List[int]:
-        return self.replay_buffer.sample_ids(batch_size=batch_size)
+        return self.replay_buffer.sample_ids(batch_size=batch_size, **kwargs)
 
     def encode_sample(self, sample_ids: List[int], **kwargs) -> Dict[str, np.ndarray]:
-        return self.replay_buffer.encode_sample(sample_ids)
+        return self.replay_buffer.encode_sample(sample_ids, **kwargs)
 
     def save_checkpoint(self, context: SaveContext):
         self.replay_buffer.save_checkpoint(
@@ -87,11 +89,11 @@ class InputOutputWrapper(BufferWrapper):
         transformed = self.in_transform(
             data_dictionary=data_dictionary, metadata=metadata
         )
-        self.replay_buffer.add(data_dictionary=transformed, metadata=metadata)
+        self.replay_buffer.add(data_dictionary=transformed, metadata=metadata, **kwargs)
         self.post_add_routine()
 
     def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
-        raw_sample = self.replay_buffer.sample(batch_size=batch_size)
+        raw_sample = self.replay_buffer.sample(batch_size=batch_size, **kwargs)
         transformed = self.out_transform(data_dictionary=raw_sample)
         return transformed
 
