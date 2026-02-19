@@ -25,7 +25,7 @@ class Buffer(ABC):
     def __init__(self) -> None:
         super().__init__()
 
-    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+    def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
         """Sample data from the replay buffer.
 
         Args:
@@ -38,6 +38,7 @@ class Buffer(ABC):
         self,
         data_dictionary: Dict[str, np.ndarray],
         metadata: Optional[Dict[str, any]] = None,
+        **kwargs,
     ) -> None:
         """Add data to the replay buffer.
 
@@ -49,7 +50,7 @@ class Buffer(ABC):
         ...
 
     @abstractmethod
-    def sample_ids(self, batch_size: int) -> List[int]:
+    def sample_ids(self, batch_size: int, **kwargs) -> List[int]:
         """Sample ids from the replay buffer.
 
         Args:
@@ -58,7 +59,7 @@ class Buffer(ABC):
         ...
 
     @abstractmethod
-    def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
+    def encode_sample(self, sample_ids: List[int], **kwargs) -> Dict[str, np.ndarray]:
         """Get specific data from the replay buffer by id.
 
         Args:

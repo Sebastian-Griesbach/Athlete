@@ -19,16 +19,18 @@ class BufferWrapper(Buffer):
         """
         self.replay_buffer = replay_buffer
 
-    def add(self, data_dictionary: Dict[str, np.ndarray], metadata: np.ndarray) -> None:
+    def add(
+        self, data_dictionary: Dict[str, np.ndarray], metadata: np.ndarray, **kwargs
+    ) -> None:
         self.replay_buffer.add(data_dictionary=data_dictionary, metadata=metadata)
 
-    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+    def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
         return self.replay_buffer.sample(batch_size=batch_size)
 
-    def sample_ids(self, batch_size: int) -> List[int]:
+    def sample_ids(self, batch_size: int, **kwargs) -> List[int]:
         return self.replay_buffer.sample_ids(batch_size=batch_size)
 
-    def encode_sample(self, sample_ids: List[int]) -> Dict[str, np.ndarray]:
+    def encode_sample(self, sample_ids: List[int], **kwargs) -> Dict[str, np.ndarray]:
         return self.replay_buffer.encode_sample(sample_ids)
 
     def save_checkpoint(self, context: SaveContext):
@@ -80,6 +82,7 @@ class InputOutputWrapper(BufferWrapper):
         self,
         data_dictionary: Dict[str, np.ndarray],
         metadata: Optional[Dict[str, any]] = None,
+        **kwargs,
     ) -> None:
         transformed = self.in_transform(
             data_dictionary=data_dictionary, metadata=metadata
@@ -87,15 +90,13 @@ class InputOutputWrapper(BufferWrapper):
         self.replay_buffer.add(data_dictionary=transformed, metadata=metadata)
         self.post_add_routine()
 
-    def sample(self, batch_size: int) -> Dict[str, np.ndarray]:
+    def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
         raw_sample = self.replay_buffer.sample(batch_size=batch_size)
         transformed = self.out_transform(data_dictionary=raw_sample)
         return transformed
 
     def in_transform(
-        self,
-        data_dictionary: Dict[str, Any],
-        metadata: Optional[Dict[str, any]] = None,
+        self, data_dictionary: Dict[str, Any], metadata: Optional[Dict[str, any]] = None
     ) -> Dict[str, Any]:
         """Overwrite this function to transform the data before adding it to the buffer.
 
@@ -107,7 +108,7 @@ class InputOutputWrapper(BufferWrapper):
         """
         return data_dictionary
 
-    def post_add_routine(self):
+    def post_add_routine(self, **kwargs):
         """This function is called after adding data to the buffer."""
         pass
 
