@@ -92,6 +92,7 @@ class Agent(CompositeSaveableComponent):
         terminated: Any = None,
         truncated: Any = None,
         env_info: Dict[str, Any] = {},
+        override_action: Any = None,
     ) -> Tuple[Any, Dict[str, Any]]:
         """Perform a step of the agent given information from the environment.
         In training mode the agent will perform updates according the specific algorithm.
@@ -105,6 +106,7 @@ class Agent(CompositeSaveableComponent):
             terminated (Any, optional): True if the episode has terminated with the given observation. Optional in evaluation mode.
             truncated (Any, optional): True if the episode has been truncated with the given observation. Optional in evaluation mode.
             env_info (Dict[str, Any], optional): Optional environment information. Might be useful for some algorithms that use privileged information during training. Defaults to {}.
+            override_action (Any, optional): If provided, the agent will assume that this action was taken in the environment instead of the action returned by the last step call. This can be used to provide rollout examples by external policies to the agent. This has no effect in evaluation mode. Defaults to None.
 
         Raises:
             ValueError: In training mode, observation, reward, terminated, and truncated must be provided.
@@ -124,6 +126,7 @@ class Agent(CompositeSaveableComponent):
                 terminated=terminated,
                 truncated=truncated,
                 environment_info=env_info,
+                override_action=override_action,
             )
         return self.evaluation_policy.act(observation=observation)
 
@@ -154,12 +157,13 @@ class Agent(CompositeSaveableComponent):
         terminated: Any,
         truncated: Any,
         environment_info: Dict[str, Any],
+        override_action: Any = None,
     ) -> Tuple[Any, Dict[str, Any]]:
         """Performs the step of the agent in training mode."""
 
         # Add data to the data collector
         new_data_point_accumulated = self.data_collector.collect(
-            action=self.last_action,
+            action=self.last_action if override_action is None else override_action,
             observation=observation,
             reward=reward,
             terminated=terminated,
