@@ -1,4 +1,5 @@
-from typing import Tuple, Callable, Optional
+from typing import Tuple, Callable, Optional, Dict
+from dataclasses import field
 
 import jax
 import jax.numpy as jnp
@@ -9,7 +10,7 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     """A flexible fully connected neural network in Flax.
 
     This module creates a multi-layer perceptron with configurable layer dimensions,
-    activations, and optional layer normalization.
+    activations, and optional pre-activation normalization.
 
     Attributes:
         layer_dims: Tuple of layer dimensions (input_dim, hidden1, hidden2, ..., output_dim).
@@ -18,20 +19,30 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
         initial_activation: Optional activation applied to the input. Default: None.
         weight_init: Kernel initializer for Dense layers. Default: lecun_uniform.
         bias_init: Bias initializer for Dense layers. Default: uniform with scale=1/sqrt(fan_in).
-        use_layer_norm: Whether to apply LayerNorm after each hidden layer. Default: False.
-        layer_norm_epsilon: Epsilon for LayerNorm numerical stability. Default: 1e-6.
+        pre_activation_module: Optional normalization module (e.g., nn.LayerNorm, RMSNorm)
+            applied after Dense and before activation in hidden layers. Default: None.
+        pre_activation_module_kwargs: Dictionary of keyword arguments for pre_activation_module. Default: None.
 
     Example:
+        >>> # With LayerNorm
         >>> net = FlaxNonLinearFullyConnectedNet(
         ...     layer_dims=(128, 256, 256, 64),
         ...     activation=nn.relu,
-        ...     use_layer_norm=True
+        ...     pre_activation_module=nn.LayerNorm,
+        ...     pre_activation_module_kwargs={"epsilon": 1e-6}
+        ... )
+        >>> # With RMSNorm
+        >>> net = FlaxNonLinearFullyConnectedNet(
+        ...     layer_dims=(128, 256, 256, 64),
+        ...     activation=nn.relu,
+        ...     pre_activation_module=RMSNorm,
+        ...     pre_activation_module_kwargs={"epsilon": 1e-6, "use_scale": True}
         ... )
         >>> params = net.init(key, jnp.ones((1, 128)))
         >>> output = net.apply(params, x)
 
     Layer ordering for hidden layers:
-        Dense → LayerNorm (if enabled) → Activation
+        Dense → pre_activation_module (if provided) → Activation
 
     Output layer:
         Dense → final_activation (if provided)
@@ -44,8 +55,8 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     initial_activation: Optional[Callable] = None
     weight_init: Callable = None
     bias_init: Callable = None
-    use_layer_norm: bool = False
-    layer_norm_epsilon: float = 1e-6
+    pre_activation_module: Optional[Callable] = None
+    pre_activation_module_kwargs: Dict = field(default_factory=dict)
 
     def setup(self):
         """Set up the layers of the network."""
@@ -71,10 +82,13 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
             for i in range(num_linear_layers)
         ]
 
-        # Create LayerNorm layers for hidden layers only (not output layer)
-        if self.use_layer_norm:
-            self.layer_norms = [
-                nn.LayerNorm(epsilon=self.layer_norm_epsilon, name=f"layer_norm_{i+1}")
+        # Create pre-activation normalization layers for hidden layers only (not output layer)
+        if self.pre_activation_module is not None:
+
+            self.pre_activation_layers = [
+                self.pre_activation_module(
+                    name=f"pre_activation_{i+1}", **self.pre_activation_module_kwargs
+                )
                 for i in range(num_linear_layers - 1)
             ]
 
@@ -91,16 +105,16 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
         if self.initial_activation is not None:
             x = self.initial_activation(x)
 
-        # Apply layers with optional layer normalization
+        # Apply layers with optional pre-activation normalization
         num_layers = len(self.layers)
         for i, layer in enumerate(self.layers):
             # Apply Dense layer
             x = layer(x)
 
-            # For hidden layers: apply LayerNorm (if enabled) then activation
+            # For hidden layers: apply pre-activation module (if provided) then activation
             if i < num_layers - 1:
-                if self.use_layer_norm:
-                    x = self.layer_norms[i](x)
+                if self.pre_activation_module is not None:
+                    x = self.pre_activation_layers[i](x)
                 x = self.activation(x)
 
         # Apply final activation if provided
