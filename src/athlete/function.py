@@ -1,5 +1,5 @@
 from operator import itemgetter
-from functools import reduce
+from functools import reduce, partial
 from typing import Union, List, Callable, Any, Tuple, Dict
 
 import numpy as np
@@ -239,3 +239,56 @@ def create_transition_data_info(
 @jax.jit
 def jax_mse_loss(predictions: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
     return jnp.mean((predictions - targets) ** 2)
+
+
+@jax.jit
+def jax_huber_loss(
+    predictions: jnp.ndarray, targets: jnp.ndarray, delta: float = 1.0
+) -> jnp.ndarray:
+    error = predictions - targets
+    abs_error = jnp.abs(error)
+    quadratic = jnp.minimum(abs_error, delta)
+    linear = abs_error - quadratic
+    return jnp.mean(0.5 * quadratic**2 + delta * linear)
+
+
+@jax.jit
+def berhu_loss(  # Reversed Huber
+    predictions: jnp.ndarray, targets: jnp.ndarray, delta: float = 1.0
+) -> jnp.ndarray:
+    error = predictions - targets
+    abs_error = jnp.abs(error)
+
+    # Linear for small errors, quadratic for large errors (C1 at |error| = delta)
+    linear_part = abs_error
+    quadratic_part = (abs_error**2 + delta**2) / (2.0 * delta)
+
+    return jnp.mean(jnp.where(abs_error <= delta, linear_part, quadratic_part))
+
+
+@partial(jax.jit, static_argnames=("exponent",))
+def generalized_berhu_loss(
+    predictions: jnp.ndarray,
+    targets: jnp.ndarray,
+    delta: float = 1.0,
+    exponent: float = 4.0,
+) -> jnp.ndarray:
+    if delta <= 0:
+        raise ValueError("delta must be > 0")
+    if exponent <= 1.0:
+        raise ValueError("exponent must be > 1 for a smooth polynomial tail")
+
+    error = predictions - targets
+    abs_error = jnp.abs(error)
+
+    linear_part = abs_error
+    poly_part = (abs_error**exponent) / (
+        exponent * (delta ** (exponent - 1.0))
+    ) + delta * (1.0 - 1.0 / exponent)
+
+    return jnp.mean(jnp.where(abs_error <= delta, linear_part, poly_part))
+
+
+@jax.jit
+def l1_loss(predictions: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
+    return jnp.mean(jnp.abs(predictions - targets))
