@@ -1,4 +1,5 @@
-from typing import Tuple, Callable
+from typing import Tuple, Callable, Dict, Optional
+from dataclasses import field
 import math
 
 import jax.numpy as jnp
@@ -19,6 +20,8 @@ class FlaxFCDiscreteQValueFunction(nn.Module):
     activation: Callable = None
     kernel_init: Callable = None
     bias_init: Callable = None
+    pre_activation_module: Optional[Callable] = None
+    pre_activation_module_kwargs: Optional[Dict] = None
 
     def setup(self):
         """Set up the Q-value network structure."""
@@ -35,6 +38,14 @@ class FlaxFCDiscreteQValueFunction(nn.Module):
         # Only include these if they are not None, otherwise defaults will be used
         if self.activation is not None:
             evaluation_net_arguments["activation"] = self.activation
+        if self.pre_activation_module is not None:
+            evaluation_net_arguments["pre_activation_module"] = (
+                self.pre_activation_module
+            )
+        if self.pre_activation_module_kwargs is not None:
+            evaluation_net_arguments["pre_activation_module_kwargs"] = (
+                self.pre_activation_module_kwargs
+            )
         if self.kernel_init is not None:
             evaluation_net_arguments["weight_init"] = self.kernel_init
         if self.bias_init is not None:

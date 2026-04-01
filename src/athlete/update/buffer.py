@@ -25,6 +25,7 @@ class Buffer(ABC):
     def __init__(self) -> None:
         super().__init__()
 
+    @abstractmethod
     def sample(self, batch_size: int, **kwargs) -> Dict[str, np.ndarray]:
         """Sample data from the replay buffer.
 

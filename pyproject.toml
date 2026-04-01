@@ -23,6 +23,11 @@ dependencies = [
     "gymnasium[classic-control]>=1.0.0",
     "torch>=2.7.0",
     "flax>=0.8.5",
+    "jax>=0.4.30",
+]
+
+[project.optional-dependencies]
+cuda12 = [
     "jax[cuda12]>=0.4.30",
 ]
 
