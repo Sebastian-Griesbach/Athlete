@@ -216,7 +216,10 @@ class Agent(CompositeSaveableComponent):
         self.last_action, self.last_policy_info = self.training_policy.reset_act(
             observation=observation
         )
-        return self.last_action, update_info
+
+        agent_info = {**self.last_policy_info, **update_info}
+
+        return self.last_action, agent_info
 
     # Overwriting the save_checkpoint function from CompositeSaveableComponent to use it as entry point for saving
     def save_checkpoint(

@@ -1,9 +1,8 @@
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional
 import numpy as np
 from operator import itemgetter
 
 from athlete.update.buffer import Buffer
-from athlete.saving.file_handler import FileHandler
 from athlete.saving.saveable_component import SaveContext
 
 
@@ -40,9 +39,9 @@ class BufferWrapper(Buffer):
             context=context,
         )
 
-    def load_checkpoint(self, file_handler: FileHandler):
+    def load_checkpoint(self, context: SaveContext):
         self.replay_buffer.load_checkpoint(
-            file_handler=file_handler,
+            context=context,
         )
 
     @property

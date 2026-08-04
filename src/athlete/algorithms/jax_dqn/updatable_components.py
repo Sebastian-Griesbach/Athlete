@@ -96,7 +96,9 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         )
 
         # calculate loss
-        loss, gradients = jax.value_and_grad(JAXDQNValueUpdate._calculate_loss)(
+        (loss, raw_q_values), gradients = jax.value_and_grad(
+            JAXDQNValueUpdate._calculate_loss, has_aux=True
+        )(
             q_value_function.params,
             q_value_function=q_value_function,
             observations=observations,
@@ -120,7 +122,10 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         )
         new_optimizer = optimizer.replace(opt_state=new_optimizer_state)
 
-        return loss, new_q_value_function, new_optimizer
+        # for logging
+        mean_q_values = raw_q_values.mean()
+
+        return loss, new_q_value_function, new_optimizer, mean_q_values
 
     @partial(jax.jit, static_argnames=["criteria"])
     def _calculate_loss(
@@ -139,7 +144,7 @@ class JAXDQNValueUpdate(FrequencyUpdate):
 
         # calculate loss
         loss = criteria(q_values, target)
-        return loss
+        return loss, raw_q_values
 
     @jax.jit
     def _calculate_target(
@@ -180,23 +185,34 @@ class JAXDQNValueUpdate(FrequencyUpdate):
         next_observations = mini_batch[constants.DATA_NEXT_OBSERVATIONS]
         terminateds = mini_batch[constants.DATA_TERMINATEDS]
 
-        loss, new_q_value_function, new_optimizer = JAXDQNValueUpdate._jitable_update(
-            q_value_function=self.mutable_q_value_function.get(),
-            target_net=self.mutable_target_net.get(),
-            optimizer=self.mutable_optimizer.get(),
-            observations=observations,
-            actions=actions,
-            rewards=rewards,
-            next_observations=next_observations,
-            terminateds=terminateds,
-            discount=self.discount,
-            criteria=self.criteria,
-            target_calculation=self.target_calculation,
-            minto=self.minto,
+        loss, new_q_value_function, new_optimizer, mean_q_values = (
+            JAXDQNValueUpdate._jitable_update(
+                q_value_function=self.mutable_q_value_function.get(),
+                target_net=self.mutable_target_net.get(),
+                optimizer=self.mutable_optimizer.get(),
+                observations=observations,
+                actions=actions,
+                rewards=rewards,
+                next_observations=next_observations,
+                terminateds=terminateds,
+                discount=self.discount,
+                criteria=self.criteria,
+                target_calculation=self.target_calculation,
+                minto=self.minto,
+            )
         )
 
         # update parameters and optimizer state
         self.mutable_q_value_function.set(new_q_value_function)
         self.mutable_optimizer.set(new_optimizer)
 
+        self.last_mean_q_values = mean_q_values
+
         return loss.item()
+
+    def post_update_routine(self):
+        # TODO this should also use a prefix
+        logging_info = {
+            "q_values_mean": self.last_mean_q_values.item(),
+        }
+        return logging_info

@@ -55,8 +55,11 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     initial_activation: Optional[Callable] = None
     weight_init: Callable = None
     bias_init: Callable = None
+    pre_transformation_module: Optional[Callable] = None
+    pre_transformation_module_kwargs: Dict = field(default_factory=dict)
     pre_activation_module: Optional[Callable] = None
     pre_activation_module_kwargs: Dict = field(default_factory=dict)
+    skip_connections: bool = False
 
     def setup(self):
         """Set up the layers of the network."""
@@ -81,6 +84,15 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
             )
             for i in range(num_linear_layers)
         ]
+
+        if self.pre_transformation_module is not None:
+            self.pre_transformation_layers = [
+                self.pre_transformation_module(
+                    name=f"pre_transformation_{i+1}",
+                    **self.pre_transformation_module_kwargs,
+                )
+                for i in range(num_linear_layers)
+            ]
 
         # Create pre-activation normalization layers for hidden layers only (not output layer)
         if self.pre_activation_module is not None:
@@ -108,6 +120,13 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
         # Apply layers with optional pre-activation normalization
         num_layers = len(self.layers)
         for i, layer in enumerate(self.layers):
+
+            if self.skip_connections:
+                layer_input = x
+
+            if self.pre_transformation_module is not None:
+                x = self.pre_transformation_layers[i](x)
+
             # Apply Dense layer
             x = layer(x)
 
@@ -116,6 +135,9 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
                 if self.pre_activation_module is not None:
                     x = self.pre_activation_layers[i](x)
                 x = self.activation(x)
+
+            if self.skip_connections:
+                x = x + layer_input
 
         # Apply final activation if provided
         if self.final_activation is not None:
