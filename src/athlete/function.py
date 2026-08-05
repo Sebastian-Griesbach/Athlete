@@ -236,6 +236,42 @@ def create_transition_data_info(
     }
 
 
+def create_jnp_transition_data_info(
+    observation_space: Space, action_space: Space
+) -> Dict[str, Dict[str, Any]]:
+    """Creates a dictionary with data information of a transition used for the replay buffer according to the observation and action space.
+
+    Args:
+        observation_space (Space): Observation space of the data.
+        action_space (Space): Action space of the data.
+
+    Returns:
+        Dict[str, Dict[str, Any]]: Dictionary with data information of a transition.
+    """
+
+    observation_info = {
+        "shape": observation_space.shape,
+        "dtype": str(jnp.dtype(observation_space.dtype)),
+    }
+    if observation_info["shape"] == ():
+        observation_info["shape"] = (1,)
+
+    action_info = {
+        "shape": action_space.shape,
+        "dtype": str(jnp.dtype(action_space.dtype)),
+    }
+    if action_info["shape"] == ():
+        action_info["shape"] = (1,)
+
+    return {
+        constants.DATA_REWARDS: {"shape": (1,), "dtype": jnp.float32},
+        constants.DATA_OBSERVATIONS: observation_info,
+        constants.DATA_NEXT_OBSERVATIONS: observation_info,
+        constants.DATA_ACTIONS: action_info,
+        constants.DATA_TERMINATEDS: {"shape": (1,), "dtype": jnp.bool_},
+    }
+
+
 @jax.jit
 def jax_mse_loss(predictions: jnp.ndarray, targets: jnp.ndarray) -> jnp.ndarray:
     return jnp.mean((predictions - targets) ** 2)
