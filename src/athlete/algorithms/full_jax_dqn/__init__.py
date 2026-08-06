@@ -5,6 +5,7 @@ import optax
 import jax.numpy as jnp
 import flashbax as fbx
 import jax
+import flax
 
 import athlete
 from athlete.update.update_rule import UpdateRule
@@ -22,6 +23,8 @@ from athlete.algorithms.jax_dqn.policy import (
 )
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
 from athlete.function import jax_mse_loss, create_transition_data_info
+
+from athlete.algorithms.full_jax_dqn.objects import DQNAgentState
 
 ARGUMENT_DISCOUNT = "discount"
 ARGUMENT_VALUE_NETWORK_CLASS = "value_network_class"
@@ -100,3 +103,9 @@ def make_full_jax_dqn(
     }
 
     replay_buffer_state = replay_buffer.init(dummy_transition)
+
+    agent_state = DQNAgentState(
+        replay_buffer_func=replay_buffer, replay_buffer_state=replay_buffer_state
+    )
+
+    return agent_state
