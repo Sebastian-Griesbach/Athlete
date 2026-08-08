@@ -269,8 +269,6 @@ class Agent(CompositeSaveableComponent):
         if not os.path.isdir(save_path):
             os.makedirs(save_path)
 
-        print(f"Saving checkpoint to {save_path}")
-
         # Save the save metadata, need for loading from checkpoint
         save_context_metadata_path = os.path.join(
             save_path,
