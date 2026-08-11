@@ -37,7 +37,7 @@ class TransitionDataCollector(flax.struct.PyTreeNode):
         reward = reward.reshape((1,))
         terminated = terminated.reshape((1,))
 
-        valid = jnp.logical_not(collector_state.episode_ended)
+        has_new_data = jnp.logical_not(collector_state.episode_ended)
 
         transition = {
             constants.DATA_OBSERVATIONS: collector_state.last_observation,
@@ -51,4 +51,4 @@ class TransitionDataCollector(flax.struct.PyTreeNode):
             last_observation=observation,
             episode_ended=jnp.logical_or(terminated[0], truncated),
         )
-        return new_collector_state, transition, valid
+        return new_collector_state, transition, has_new_data
