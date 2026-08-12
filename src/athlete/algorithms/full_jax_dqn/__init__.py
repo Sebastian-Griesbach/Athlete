@@ -59,12 +59,14 @@ def make_full_jax_dqn(
         max_length=replay_buffer_capacity,
         min_length=replay_buffer_mini_batch_size,
         sample_batch_size=replay_buffer_mini_batch_size,
-        add_sequence=True,
+        add_sequence=False,
         add_batch_size=1,
     )
 
     transition_data_info = create_transition_data_info(
-        observation_space=observation_space, action_space=action_space
+        observation_space=observation_space,
+        action_space=action_space,
+        flat_transition=True,
     )
     dummy_transition = {
         field: jnp.zeros(info["shape"], dtype=info["dtype"])

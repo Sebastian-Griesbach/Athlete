@@ -204,7 +204,9 @@ def jax_extract_data_from_batch(
 
 
 def create_transition_data_info(
-    observation_space: Space, action_space: Space
+    observation_space: Space,
+    action_space: Space,
+    flat_transition: bool = False,
 ) -> Dict[str, Dict[str, Any]]:
     """Creates a dictionary with data information of a transition used for the replay buffer according to the observation and action space.
 
@@ -227,13 +229,16 @@ def create_transition_data_info(
     if action_info["shape"] == ():
         action_info["shape"] = (1,)
 
-    return {
+    transition_info = {
         constants.DATA_REWARDS: {"shape": (1,), "dtype": np.float32},
         constants.DATA_OBSERVATIONS: observation_info,
-        constants.DATA_NEXT_OBSERVATIONS: observation_info,
         constants.DATA_ACTIONS: action_info,
         constants.DATA_TERMINATEDS: {"shape": (1,), "dtype": np.bool_},
     }
+    if not flat_transition:
+        transition_info[constants.DATA_NEXT_OBSERVATIONS] = observation_info
+
+    return transition_info
 
 
 def create_jnp_transition_data_info(

@@ -21,6 +21,8 @@ DATA_LOG_PROBS = "log_probs"
 DATA_VALUES = "values"
 DATA_ADVANTAGES = "advantages"
 
+LOGGING_DATA_VALID = "valid"
+
 ROLLOUT_DATA_OBSERVATIONS_PER_EPISODE = "observations_per_episode"
 ROLLOUT_DATA_ACTIONS_PER_EPISODE = "actions_per_episode"
 ROLLOUT_DATA_REWARDS_PER_EPISODE = "rewards_per_episode"

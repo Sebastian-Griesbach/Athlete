@@ -1,10 +1,14 @@
 from functools import partial
+from typing import Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
 import flax
 import flashbax as fbx
 import optax
+
+from athlete import constants
+from athlete.jax_objects import FunctionWrapper
 
 
 @jax.jit
@@ -19,8 +23,17 @@ def replay_buffer_update(
     return new_replay_buffer_state
 
 
-@partial(jax.jit, static_argnames=["criteria", "target_calculation", "minto"])
-def _jitable_update(
+@partial(
+    jax.jit,
+    static_argnames=[
+        "criteria",
+        "target_calculation",
+        "minto",
+        "double_q",
+        "logging_prefix",
+    ],
+)
+def dqn_value_update(
     q_value_function: flax.linen.Module,
     q_value_function_variables: flax.core.FrozenDict,
     target_q_value_function_variables: flax.core.FrozenDict,
@@ -30,34 +43,59 @@ def _jitable_update(
     replay_buffer_state: fbx.FlatBufferState,
     discount: float,
     criteria: FunctionWrapper,
-    target_calculation: FunctionWrapper,
+    double_q: bool,
     minto: bool,
     random_key: jax.Array,
-) -> Tuple[  # new variables, new optimizer state, new replay buffer state, loss, random key
-    flax.core.FrozenDict, optax.OptState, fbx.FlatBufferState, jax.Array, jax.Array
+    logging_prefix: str = "",
+) -> Tuple[  # new variables, new optimizer state, new replay buffer state, random_key, dictionary for logging
+    flax.core.FrozenDict,
+    optax.OptState,
+    fbx.FlatBufferState,
+    jax.Array,
+    Dict[str, jax.Array],
 ]:
 
-    raw_next_q_values = target_q_value_function_variables(next_observations)
+    random_key, subkey = jax.random.split(random_key)
+    # Construct transitions from flat replay buffer
+    batch = replay_buffer_func.sample(replay_buffer_state, subkey)
+    observations = batch.first[constants.DATA_OBSERVATIONS]
+    actions = batch.first[constants.DATA_ACTIONS]
+    rewards = batch.first[constants.DATA_REWARDS]
+    next_observations = batch.second[constants.DATA_OBSERVATIONS]
+    terminateds = batch.first[constants.DATA_TERMINATEDS]
+
+    raw_target_next_q_values = q_value_function.apply(
+        target_q_value_function_variables, next_observations
+    )
 
     if minto:
-        online_raw_next_q_values = q_value_function(next_observations)
-        raw_next_q_values = jnp.minimum(raw_next_q_values, online_raw_next_q_values)
+        raw_online_next_q_values = q_value_function.apply(
+            q_value_function_variables, next_observations
+        )
+        raw_target_next_q_values = jnp.minimum(
+            raw_online_next_q_values, raw_target_next_q_values
+        )
+
+    if double_q:
+        raw_online_next_q_values = q_value_function.apply(
+            q_value_function_variables, next_observations
+        )
+        online_next_actions = jnp.argmax(raw_online_next_q_values, axis=-1)
+        target_next_q_values = jnp.take_along_axis(
+            raw_target_next_q_values, online_next_actions[..., None], axis=-1
+        )
+    else:
+        target_next_q_values = jnp.max(raw_target_next_q_values, axis=-1)
 
     # calculate target
-    target = target_calculation(
-        rewards=rewards,
-        next_observations=next_observations,
-        terminateds=terminateds,
-        raw_next_q_values=raw_next_q_values,
-        discount=discount,
-        q_value_function=q_value_function,
-    )
+    not_terminateds = jnp.logical_not(terminateds)
+    target = rewards + not_terminateds * discount * target_next_q_values
 
     # calculate loss
     (loss, raw_q_values), gradients = jax.value_and_grad(
-        JAXDQNValueUpdate._calculate_loss, has_aux=True
+        calculate_dqn_loss, has_aux=True
     )(
-        q_value_function.params,
+        q_value_function_variables,
         q_value_function=q_value_function,
         observations=observations,
         actions=actions,
@@ -66,72 +104,44 @@ def _jitable_update(
     )
 
     # apply gradients
-    updates, new_optimizer_state = optimizer.tx.update(
-        gradients, optimizer.opt_state, q_value_function.params
+    updates, optimizer_state = optimizer.tx.update(
+        gradients, optimizer_state, q_value_function_variables
     )
 
-    new_q_value_function_parameters = optax.apply_updates(
-        q_value_function.params, updates
+    q_value_function_variables = optax.apply_updates(
+        q_value_function_variables, updates
     )
-
-    # create new q_value_function and optimizer
-    new_q_value_function = q_value_function.replace(
-        variables=new_q_value_function_parameters
-    )
-    new_optimizer = optimizer.replace(opt_state=new_optimizer_state)
 
     # for logging
     mean_q_values = raw_q_values.mean()
+    logging_dict = {
+        f"{logging_prefix}{constants.LOGGING_DATA_VALID}": jnp.array(True),
+        f"{logging_prefix}loss": loss,
+        f"{logging_prefix}mean_q_values": mean_q_values,
+    }
 
-    return loss, new_q_value_function, new_optimizer, mean_q_values
+    return (
+        q_value_function_variables,
+        optimizer_state,
+        replay_buffer_state,
+        random_key,
+        logging_dict,
+    )
 
 
 @partial(jax.jit, static_argnames=["criteria"])
-def _calculate_loss(
-    q_value_function_parameters: flax.core.FrozenDict,
-    q_value_function: ModuleState,
+def calculate_dqn_loss(
+    q_value_function_variables: flax.core.FrozenDict,
+    q_value_function: flax.linen.Module,
     observations: jnp.ndarray,
     actions: jnp.ndarray,
     target: jnp.ndarray,
     criteria: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
 ) -> jnp.ndarray:
     # calculate predictions
-    raw_q_values = q_value_function.apply_fn(q_value_function_parameters, observations)
+    raw_q_values = q_value_function.apply(q_value_function_variables, observations)
     q_values = jnp.take_along_axis(raw_q_values, actions, axis=1)
 
     # calculate loss
     loss = criteria(q_values, target)
     return loss, raw_q_values
-
-
-@jax.jit
-def _calculate_target(
-    rewards: jnp.ndarray,
-    next_observations: jnp.ndarray,
-    terminateds: jnp.ndarray,
-    raw_next_q_values: jnp.ndarray,
-    discount: float,
-    q_value_function: ModuleState,  # Not needed only here to have same signature as cross validation
-) -> jnp.ndarray:
-    next_q_values = jnp.max(raw_next_q_values, axis=1, keepdims=True)
-    not_terminateds = jnp.logical_not(terminateds)
-    target = rewards + not_terminateds * discount * next_q_values
-    return target
-
-
-@jax.jit
-def _calculate_cross_validation_target(
-    rewards: jnp.ndarray,
-    next_observations: jnp.ndarray,
-    terminateds: jnp.ndarray,
-    raw_next_q_values: jnp.ndarray,
-    discount: float,
-    q_value_function: ModuleState,
-) -> jnp.ndarray:
-    next_actions = jnp.argmax(
-        q_value_function(next_observations), axis=1, keepdims=True
-    )
-    next_q_values = jnp.take_along_axis(raw_next_q_values, next_actions, axis=1)
-    not_terminateds = jnp.logical_not(terminateds)
-    target = rewards + not_terminateds * discount * next_q_values
-    return target
