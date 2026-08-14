@@ -19,9 +19,10 @@ def get_greedy_action(
     observation: jax.Array,
     post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> int:
+    observation = jnp.expand_dims(observation, axis=0)
     observation = post_replay_buffer_preprocessing(observation)
     q_values = q_value_function.apply(q_value_function_variables, observation)
-    return jnp.argmax(q_values, axis=1)
+    return jnp.argmax(q_values, axis=-1)
 
 
 def get_dqn_train_action(
@@ -35,8 +36,8 @@ def get_dqn_train_action(
     num_actions: int,
     post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> Tuple[
-    jax.Array, jax.Array, jax.Array
-]:  # action(s), random_key, if the selected action was greedy
+    jax.Array, jax.Array, jax.Array, jax.Array
+]:  # action(s), random_key, if the selected action was greedy, action_data_valid
 
     random_key, sub_key = jax.random.split(random_key)
 
@@ -49,7 +50,9 @@ def get_dqn_train_action(
     action = jax.lax.cond(
         perform_random_action,
         lambda: get_random_action(
-            num_actions=num_actions, select_n_actions=1, random_key=sub_key
+            num_actions=num_actions,
+            select_n_actions=1,
+            random_key=sub_key,
         ),
         lambda: get_greedy_action(
             q_value_function=q_value_function,
@@ -59,4 +62,4 @@ def get_dqn_train_action(
         ),
     )
 
-    return action, random_key, ~perform_random_action
+    return action, random_key, ~perform_random_action, jnp.array(True)

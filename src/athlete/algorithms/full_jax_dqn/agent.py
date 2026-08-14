@@ -1,8 +1,7 @@
 from functools import partial
-from typing import Callable, Dict
+from typing import Callable, Dict, Tuple
 
 import flax
-import flashbax as fbx
 import jax
 import jax.numpy as jnp
 import optax
@@ -10,20 +9,22 @@ import optax
 from athlete.algorithms.full_jax_dqn.updateable_component import (
     flat_replay_buffer_transition_update,
     perform_n_q_value_function_updates,
-    FlatDataCollectorState,
     target_network_update,
 )
 from athlete.algorithms.full_jax_dqn.policy import (
     get_dqn_train_action,
     get_greedy_action,
 )
-
-from athlete import constants
+from athlete.algorithms.full_jax_dqn.buffer import (
+    EpisodeAwareFlatBuffer,
+    EpisodeAwareFlatBufferState,
+)
 
 
 class DQNAgentState(flax.struct.PyTreeNode):
-    replay_buffer_state: fbx.FlatBufferState = flax.struct.field(pytree_node=True)
-    data_collector_state: FlatDataCollectorState = flax.struct.field(pytree_node=True)
+    replay_buffer_state: EpisodeAwareFlatBufferState = flax.struct.field(
+        pytree_node=True
+    )
     last_action: jax.Array = flax.struct.field(pytree_node=True)
     random_key: jax.Array = flax.struct.field(pytree_node=True)
     q_value_function_variables: Dict[str, jax.Array] = flax.struct.field(
@@ -37,7 +38,7 @@ class DQNAgentState(flax.struct.PyTreeNode):
 
 
 class DQNAgentSpecification(flax.struct.PyTreeNode):
-    replay_buffer_func: fbx.FlatBuffer = flax.struct.field(pytree_node=False)
+    replay_buffer_func: EpisodeAwareFlatBuffer = flax.struct.field(pytree_node=False)
     q_value_function: flax.linen.Module = flax.struct.field(pytree_node=False)
     discount: float = flax.struct.field(pytree_node=False)
     criteria: Callable = flax.struct.field(pytree_node=False)
@@ -54,6 +55,77 @@ class DQNAgentSpecification(flax.struct.PyTreeNode):
     post_replay_buffer_preprocessing: Callable = flax.struct.field(pytree_node=False)
 
 
+# TODO add specification with make function as part of a class using partial similar to how buffer does it
+# TODO make compatible for parallel environments
+# TODO think about how to separate part of agent state that is required for evaluation
+# TODO save and load functionality
+
+
+def _reshape_to_single_value_array(array: jax.Array) -> jax.Array:
+    return jnp.asarray(array).reshape((1,))
+
+
+@partial(
+    jax.jit,
+    static_argnames=("agent_specification",),
+    donate_argnames=("agent_state",),
+)
+def dqn_train_reset_step(
+    agent_specification: DQNAgentSpecification,
+    agent_state: DQNAgentState,
+    observation: jax.Array,
+) -> Tuple[DQNAgentState, jax.Array, Dict[str, jax.Array]]:
+    observation = jnp.asarray(observation)
+
+    # all state objects that might get updated
+    replay_buffer_state = agent_state.replay_buffer_state
+    random_key = agent_state.random_key
+    # We only advance the step count for a step in the environment, which has happened if train_step is called
+
+    # Replay buffer update
+    replay_buffer_state = flat_replay_buffer_transition_update(
+        replay_buffer_func=agent_specification.replay_buffer_func,
+        replay_buffer_state=replay_buffer_state,
+        observation=observation,
+        reward=jnp.full((1,), jnp.nan),  # no reward for reset step
+        action=jnp.full(
+            (1,),
+            agent_specification.num_actions,
+            dtype=agent_state.last_action.dtype,
+        ),  # invalid action for reset step
+        terminated=jnp.array([False]),
+        truncated=jnp.array([False]),
+        new_episode_started=jnp.array(True),  # reset step starts a new episode
+    )
+
+    # Policy
+    action, random_key, is_greedy, action_data_valid = get_dqn_train_action(
+        q_value_function=agent_specification.q_value_function,
+        q_value_function_variables=agent_state.q_value_function_variables,
+        epsilon_schedule=agent_specification.epsilon_schedule,
+        warm_up_steps=agent_specification.warm_up_steps,
+        step_count=agent_state.step_count,
+        observation=observation,
+        random_key=random_key,
+        num_actions=agent_specification.num_actions,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+    )
+
+    # New agent state
+    agent_state = agent_state.replace(
+        replay_buffer_state=replay_buffer_state,
+        last_action=action,
+        random_key=random_key,
+    )
+
+    # Logging data
+    logging_dict = {
+        "action_is_greedy": is_greedy,
+        "action_data_valid": action_data_valid,
+    }
+    return agent_state, action, logging_dict
+
+
 @partial(
     jax.jit,
     static_argnames=("agent_specification",),
@@ -66,28 +138,35 @@ def dqn_train_step(
     reward: jax.Array,
     terminated: jax.Array,
     truncated: jax.Array,  # Not needed but should be part of the interface
-) -> DQNAgentState:
+) -> Tuple[DQNAgentState, jax.Array, Dict[str, jax.Array]]:
+    observation = jnp.asarray(observation)
+    reward = _reshape_to_single_value_array(reward)
+    terminated = _reshape_to_single_value_array(terminated).astype(bool)
+    truncated = _reshape_to_single_value_array(truncated).astype(bool)
 
     # all state objects that might get updated
     replay_buffer_state = agent_state.replay_buffer_state
-    data_collector_state = agent_state.data_collector_state
     q_value_function_variables = agent_state.q_value_function_variables
     optimizer_state = agent_state.optimizer_state
     random_key = agent_state.random_key
     target_q_value_function_variables = agent_state.target_q_value_function_variables
-    last_action = agent_state.last_action
+    last_action = _reshape_to_single_value_array(agent_state.last_action).astype(
+        agent_state.last_action.dtype
+    )
     step_count = agent_state.step_count
 
     # Replay buffer update
-    replay_buffer_state, data_collector_state = flat_replay_buffer_transition_update(
+    replay_buffer_state = flat_replay_buffer_transition_update(
         replay_buffer_func=agent_specification.replay_buffer_func,
         replay_buffer_state=replay_buffer_state,
-        data_collector_state=data_collector_state,
         action=last_action,
         observation=observation,
         reward=reward,
         terminated=terminated,
         truncated=truncated,
+        new_episode_started=jnp.array(
+            False
+        ),  # we know this to be tru if step was called instead of reset_step
     )
 
     # Value function update
@@ -96,7 +175,7 @@ def dqn_train_step(
         optimizer_state,
         random_key,
         (
-            is_logging_data_valid,
+            update_data_valid,
             losses,
             mean_q_values,
         ),  # TODO add marker for if logging data is valid or not
@@ -140,23 +219,34 @@ def dqn_train_step(
     )
 
     # Policy
-    action, random_key, is_greedy = get_dqn_train_action(
-        q_value_function=agent_specification.q_value_function,
-        q_value_function_variables=q_value_function_variables,
-        epsilon_schedule=agent_specification.epsilon_schedule,
-        warm_up_steps=agent_specification.warm_up_steps,
-        step_count=step_count,
-        observation=observation,
-        random_key=random_key,
-        num_actions=agent_specification.num_actions,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+
+    action, random_key, is_greedy, action_data_valid = jax.lax.cond(
+        jnp.logical_not(
+            jnp.asarray(terminated | truncated, dtype=bool).reshape(())
+        ),  # Only return an action if the episode continues
+        lambda: get_dqn_train_action(
+            q_value_function=agent_specification.q_value_function,
+            q_value_function_variables=q_value_function_variables,
+            epsilon_schedule=agent_specification.epsilon_schedule,
+            warm_up_steps=agent_specification.warm_up_steps,
+            step_count=step_count,
+            observation=observation,
+            random_key=random_key,
+            num_actions=agent_specification.num_actions,
+            post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+        ),
+        lambda: (
+            jnp.full_like(last_action, agent_specification.num_actions),
+            random_key,
+            jnp.array(False),
+            jnp.array(False),
+        ),
     )
 
     # New agent state
 
     agent_state = agent_state.replace(
         replay_buffer_state=replay_buffer_state,
-        data_collector_state=data_collector_state,
         q_value_function_variables=q_value_function_variables,
         optimizer_state=optimizer_state,
         random_key=random_key,
@@ -167,9 +257,40 @@ def dqn_train_step(
 
     # Logging data
     logging_dict = {
+        "update_data_valid": update_data_valid,
         "loss": losses,
         "mean_q_values": mean_q_values,
         "action_is_greedy": is_greedy,
+        "action_data_valid": action_data_valid,
     }
 
-    return agent_state, logging_dict
+    return agent_state, action, logging_dict
+
+
+@partial(
+    jax.jit,
+    static_argnames=("agent_specification",),
+    donate_argnames=("agent_state",),
+)
+def dqn_eval_step(
+    agent_specification: DQNAgentSpecification,
+    agent_state: DQNAgentState,
+    observation: jax.Array,
+) -> Tuple[jax.Array, Dict[str, jax.Array]]:  # action, logging_dict
+    observation = jnp.asarray(observation)
+
+    action = get_greedy_action(
+        q_value_function=agent_specification.q_value_function,
+        q_value_function_variables=agent_state.q_value_function_variables,
+        observation=observation,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+    )
+
+    # For DQN agent state is unchanged during evaluation
+
+    return agent_state, action, {}
+
+
+dqn_eval_reset_step = (
+    dqn_eval_step  # For DQN eval reset step is the same as regular eval step
+)

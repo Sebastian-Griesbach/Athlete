@@ -4,59 +4,39 @@ from typing import Callable, Dict, Tuple
 import jax
 import jax.numpy as jnp
 import flax
-import flashbax as fbx
 import optax
 
 from athlete import constants
 from athlete.jax_objects import FunctionWrapper
+from athlete.algorithms.full_jax_dqn.buffer import (
+    EpisodeAwareFlatBuffer,
+    EpisodeAwareFlatBufferState,
+)
 
 
-class FlatDataCollectorState(flax.struct.PyTreeNode):
-    last_observation: jax.Array = flax.struct.field(pytree_node=True)
-
-
-def flat_collect(
-    data_collector_state: FlatDataCollectorState,
+def flat_replay_buffer_transition_update(
+    replay_buffer_func: EpisodeAwareFlatBuffer,
+    replay_buffer_state: EpisodeAwareFlatBufferState,
     action: jax.Array,
     observation: jax.Array,
     reward: jax.Array,
     terminated: jax.Array,
     truncated: jax.Array,
-) -> Tuple[FlatDataCollectorState, Dict[str, jax.Array]]:
+    new_episode_started: jax.Array,
+) -> EpisodeAwareFlatBufferState:
     experience = {
-        constants.DATA_OBSERVATIONS: data_collector_state.last_observation,
+        constants.DATA_OBSERVATIONS: observation,
         constants.DATA_ACTIONS: action,
         constants.DATA_REWARDS: reward,
         constants.DATA_TERMINATEDS: terminated,
     }
 
-    data_collector_state = FlatDataCollectorState(last_observation=observation)
-    return data_collector_state, experience
-
-
-def flat_collect_reset(
-    data_collector_state: FlatDataCollectorState,
-    observation: jax.Array,
-) -> FlatDataCollectorState:
-    collector_state = FlatDataCollectorState(last_observation=observation)
-    return collector_state
-
-
-def flat_replay_buffer_transition_update(
-    replay_buffer_func: fbx.FlatBuffer,
-    replay_buffer_state: fbx.FlatBufferState,
-    data_collector_state: FlatDataCollectorState,
-    action: jax.Array,
-    observation: jax.Array,
-    reward: jax.Array,
-    terminated: jax.Array,
-    truncated: jax.Array,
-) -> Tuple[fbx.FlatBufferState, FlatDataCollectorState]:
-    data_collector_state, transition_data = flat_collect(
-        data_collector_state, action, observation, reward, terminated, truncated
+    replay_buffer_state = replay_buffer_func.add(
+        state=replay_buffer_state,
+        entry=experience,
+        new_episode_started=new_episode_started,
     )
-    replay_buffer_state = replay_buffer_func.add(replay_buffer_state, transition_data)
-    return replay_buffer_state, data_collector_state
+    return replay_buffer_state
 
 
 def dqn_value_update(
@@ -159,8 +139,8 @@ def calculate_dqn_loss(
 
 
 def get_transitions_from_flat_buffer(
-    replay_buffer_func: fbx.FlatBuffer,
-    replay_buffer_state: fbx.FlatBufferState,
+    replay_buffer_func: EpisodeAwareFlatBuffer,
+    replay_buffer_state: EpisodeAwareFlatBufferState,
     random_key: jax.Array,
 ) -> Tuple[
     jnp.ndarray,
@@ -171,16 +151,16 @@ def get_transitions_from_flat_buffer(
 ]:
     batch = replay_buffer_func.sample(replay_buffer_state, random_key)
     observations = batch.experience.first[constants.DATA_OBSERVATIONS]
-    actions = batch.experience.first[constants.DATA_ACTIONS]
-    rewards = batch.experience.first[constants.DATA_REWARDS]
+    actions = batch.experience.second[constants.DATA_ACTIONS]
+    rewards = batch.experience.second[constants.DATA_REWARDS]
     next_observations = batch.experience.second[constants.DATA_OBSERVATIONS]
-    terminateds = batch.experience.first[constants.DATA_TERMINATEDS]
+    terminateds = batch.experience.second[constants.DATA_TERMINATEDS]
     return observations, actions, rewards, next_observations, terminateds
 
 
 def perform_n_q_value_function_updates(
-    replay_buffer_func: fbx.FlatBuffer,
-    replay_buffer_state: fbx.FlatBufferState,
+    replay_buffer_func: EpisodeAwareFlatBuffer,
+    replay_buffer_state: EpisodeAwareFlatBufferState,
     q_value_function: flax.linen.Module,
     q_value_function_variables: flax.core.FrozenDict,
     target_q_value_function_variables: flax.core.FrozenDict,
