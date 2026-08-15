@@ -8,25 +8,14 @@ import flashbax as fbx
 import jax
 import flax
 
-import athlete
-from athlete.algorithms.full_jax_dqn.agent import DQNAgentSpecification
-from athlete.update.update_rule import UpdateRule
-from athlete.policy.policy import Policy
-from athlete.data_collection.provider import UpdateDataProvider
+from athlete.algorithms.full_jax_dqn.agent import DQNAgentState, DQNAgentSpecification
 from athlete import constants
-from athlete.data_collection.collector import DataCollector
-from athlete.data_collection.transition import GymnasiumTransitionDataCollector
-from athlete.global_objects import RNGHandler
-from athlete.jax_objects import MutableJaxModule, ModuleState, FunctionWrapper
-from athlete.algorithms.jax_dqn.update import JAXDQNUpdate
-from athlete.algorithms.jax_dqn.policy import (
-    JAXDQNTrainingPolicy,
-    JAXDQNEvaluationPolicy,
-)
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
 from athlete.function import jax_mse_loss, create_transition_data_info
 
 from athlete.algorithms.full_jax_dqn.agent import DQNAgentState, DQNAgentSpecification
+from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent
+from athlete.algorithms.full_jax_dqn.interface import Agent
 
 
 def make_full_jax_dqn(
@@ -89,6 +78,12 @@ def make_full_jax_dqn(
     q_value_function_variables = target_q_value_function_variables = (
         q_value_function.init(sub_key, dummy_input)
     )
+
+    # Target network
+    target_q_value_function_variables = q_value_function_variables.copy()
+
+    # Optimizer
+    # TODO continue here
 
     agent_state = DQNAgentState(
         replay_buffer_func=replay_buffer,

@@ -19,6 +19,7 @@ from athlete.algorithms.full_jax_dqn.buffer import (
     EpisodeAwareFlatBuffer,
     EpisodeAwareFlatBufferState,
 )
+from athlete.algorithms.full_jax_dqn.jax_interface import JaxEvaluationAgent
 
 
 class DQNAgentState(flax.struct.PyTreeNode):
@@ -37,6 +38,12 @@ class DQNAgentState(flax.struct.PyTreeNode):
     step_count: jax.Array = flax.struct.field(pytree_node=True)
 
 
+class DQNEvaluationAgentState(flax.struct.PyTreeNode):
+    q_value_function_variables: Dict[str, jax.Array] = flax.struct.field(
+        pytree_node=True
+    )
+
+
 class DQNAgentSpecification(flax.struct.PyTreeNode):
     replay_buffer_func: EpisodeAwareFlatBuffer = flax.struct.field(pytree_node=False)
     q_value_function: flax.linen.Module = flax.struct.field(pytree_node=False)
@@ -52,6 +59,11 @@ class DQNAgentSpecification(flax.struct.PyTreeNode):
     target_network_update_frequency: int = flax.struct.field(pytree_node=False)
     target_network_update_tau: float = flax.struct.field(pytree_node=False)
     num_actions: int = flax.struct.field(pytree_node=False)
+    post_replay_buffer_preprocessing: Callable = flax.struct.field(pytree_node=False)
+
+
+class DQNEvaluationAgentSpecification(flax.struct.PyTreeNode):
+    q_value_function: flax.linen.Module = flax.struct.field(pytree_node=False)
     post_replay_buffer_preprocessing: Callable = flax.struct.field(pytree_node=False)
 
 
@@ -265,6 +277,36 @@ def dqn_train_step(
     }
 
     return agent_state, action, logging_dict
+
+
+@partial(
+    jax.jit,
+    static_argnames=("agent_specification",),
+)
+def dqn_make_evaluation_agent(
+    agent_specification: DQNAgentSpecification,
+    agent_state: DQNAgentState,
+) -> Tuple[DQNEvaluationAgentState, Callable, Callable]:
+
+    evaluation_agent_state = DQNEvaluationAgentState(
+        q_value_function_variables=agent_state.q_value_function_variables.copy()
+    )  # use copy to break donation
+    evaluation_agent_specification = DQNEvaluationAgentSpecification(
+        q_value_function=agent_specification.q_value_function,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+    )  # needs no copy since specification is static
+
+    evaluation_agent = JaxEvaluationAgent(
+        step=partial(
+            dqn_eval_step,
+            evaluation_agent_specification,
+        ),
+        reset_step=partial(
+            dqn_eval_reset_step,
+            evaluation_agent_specification,
+        ),
+    )
+    return evaluation_agent_state, evaluation_agent
 
 
 @partial(
