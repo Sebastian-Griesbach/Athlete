@@ -45,10 +45,10 @@ class DQNEvaluationAgentState(flax.struct.PyTreeNode):
 
 
 class DQNAgentSpecification(flax.struct.PyTreeNode):
-    replay_buffer_func: EpisodeAwareFlatBuffer = flax.struct.field(pytree_node=False)
+    replay_buffer: EpisodeAwareFlatBuffer = flax.struct.field(pytree_node=False)
     q_value_function: flax.linen.Module = flax.struct.field(pytree_node=False)
     discount: float = flax.struct.field(pytree_node=False)
-    criteria: Callable = flax.struct.field(pytree_node=False)
+    loss_function: Callable = flax.struct.field(pytree_node=False)
     minto: bool = flax.struct.field(pytree_node=False)
     double_q: bool = flax.struct.field(pytree_node=False)
     optimizer: optax.GradientTransformation = flax.struct.field(pytree_node=False)
@@ -59,12 +59,16 @@ class DQNAgentSpecification(flax.struct.PyTreeNode):
     target_network_update_frequency: int = flax.struct.field(pytree_node=False)
     target_network_update_tau: float = flax.struct.field(pytree_node=False)
     num_actions: int = flax.struct.field(pytree_node=False)
-    post_replay_buffer_preprocessing: Callable = flax.struct.field(pytree_node=False)
+    post_replay_buffer_observation_preprocessing: Callable = flax.struct.field(
+        pytree_node=False
+    )
 
 
 class DQNEvaluationAgentSpecification(flax.struct.PyTreeNode):
     q_value_function: flax.linen.Module = flax.struct.field(pytree_node=False)
-    post_replay_buffer_preprocessing: Callable = flax.struct.field(pytree_node=False)
+    post_replay_buffer_observation_preprocessing: Callable = flax.struct.field(
+        pytree_node=False
+    )
 
 
 # TODO add specification with make function as part of a class using partial similar to how buffer does it
@@ -96,7 +100,7 @@ def dqn_train_reset_step(
 
     # Replay buffer update
     replay_buffer_state = flat_replay_buffer_transition_update(
-        replay_buffer_func=agent_specification.replay_buffer_func,
+        replay_buffer_func=agent_specification.replay_buffer,
         replay_buffer_state=replay_buffer_state,
         observation=observation,
         reward=jnp.full((1,), jnp.nan),  # no reward for reset step
@@ -120,7 +124,7 @@ def dqn_train_reset_step(
         observation=observation,
         random_key=random_key,
         num_actions=agent_specification.num_actions,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
     )
 
     # New agent state
@@ -169,7 +173,7 @@ def dqn_train_step(
 
     # Replay buffer update
     replay_buffer_state = flat_replay_buffer_transition_update(
-        replay_buffer_func=agent_specification.replay_buffer_func,
+        replay_buffer_func=agent_specification.replay_buffer,
         replay_buffer_state=replay_buffer_state,
         action=last_action,
         observation=observation,
@@ -193,10 +197,10 @@ def dqn_train_step(
         ),  # TODO add marker for if logging data is valid or not
     ) = jax.lax.cond(
         (step_count >= agent_specification.warm_up_steps)
-        & agent_specification.replay_buffer_func.can_sample(replay_buffer_state)
+        & agent_specification.replay_buffer.can_sample(replay_buffer_state)
         & (step_count % agent_specification.value_function_update_frequency == 0),
         lambda: perform_n_q_value_function_updates(
-            replay_buffer_func=agent_specification.replay_buffer_func,
+            replay_buffer_func=agent_specification.replay_buffer,
             replay_buffer_state=replay_buffer_state,
             q_value_function=agent_specification.q_value_function,
             q_value_function_variables=q_value_function_variables,
@@ -204,7 +208,7 @@ def dqn_train_step(
             optimizer=agent_specification.optimizer,
             optimizer_state=optimizer_state,
             discount=agent_specification.discount,
-            criteria=agent_specification.criteria,
+            loss_function=agent_specification.loss_function,
             double_q=agent_specification.double_q,
             minto=agent_specification.minto,
             random_key=random_key,
@@ -245,7 +249,7 @@ def dqn_train_step(
             observation=observation,
             random_key=random_key,
             num_actions=agent_specification.num_actions,
-            post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+            post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
         ),
         lambda: (
             jnp.full_like(last_action, agent_specification.num_actions),
@@ -283,7 +287,7 @@ def dqn_train_step(
     jax.jit,
     static_argnames=("agent_specification",),
 )
-def dqn_make_evaluation_agent(
+def make_dqn_evaluation_agent(
     agent_specification: DQNAgentSpecification,
     agent_state: DQNAgentState,
 ) -> Tuple[DQNEvaluationAgentState, Callable, Callable]:
@@ -293,7 +297,7 @@ def dqn_make_evaluation_agent(
     )  # use copy to break donation
     evaluation_agent_specification = DQNEvaluationAgentSpecification(
         q_value_function=agent_specification.q_value_function,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
     )  # needs no copy since specification is static
 
     evaluation_agent = JaxEvaluationAgent(
@@ -325,7 +329,7 @@ def dqn_eval_step(
         q_value_function=agent_specification.q_value_function,
         q_value_function_variables=agent_state.q_value_function_variables,
         observation=observation,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_preprocessing,
+        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
     )
 
     # For DQN agent state is unchanged during evaluation

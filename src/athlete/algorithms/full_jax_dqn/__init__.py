@@ -1,24 +1,30 @@
-from typing import Dict, Any, Optional, Tuple
+from typing import Callable, Dict, Any, Optional, Tuple
+from functools import partial
 import random
 
 from gymnasium.spaces import Space, Box, Discrete
 import optax
 import jax.numpy as jnp
-import flashbax as fbx
 import jax
-import flax
 
 from athlete.algorithms.full_jax_dqn.agent import DQNAgentState, DQNAgentSpecification
 from athlete import constants
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
 from athlete.function import jax_mse_loss, create_transition_data_info
 
-from athlete.algorithms.full_jax_dqn.agent import DQNAgentState, DQNAgentSpecification
+from athlete.algorithms.full_jax_dqn.agent import (
+    DQNAgentState,
+    DQNAgentSpecification,
+    dqn_train_step,
+    dqn_train_reset_step,
+    make_dqn_evaluation_agent,
+)
 from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent
-from athlete.algorithms.full_jax_dqn.interface import Agent
+from athlete.algorithms.full_jax_dqn.interface import Agent, JaxAgentWrapper
+from athlete.algorithms.full_jax_dqn.buffer import make_episode_aware_flat_buffer
 
 
-def make_full_jax_dqn(
+def make_jax_agent(
     observation_space: Space,
     action_space: Space,
     replay_buffer_capacity: int = 100_000,
@@ -32,7 +38,22 @@ def make_full_jax_dqn(
     optimizer_class: Any = optax.adam,
     optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
     random_key: Optional[jax.Array] = None,
-) -> Tuple[DQNAgentSpecification, DQNAgentState]:
+    discount: float = 0.99,
+    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
+    minto: bool = True,
+    double_q: bool = False,
+    value_function_update_frequency: int = 4,
+    value_function_number_of_updates: int = 4,
+    warm_up_steps: int = 1000,
+    target_network_update_frequency: int = 250,
+    target_network_update_tau: float = 1.0,
+    epsilon_start: float = 1.0,
+    epsilon_end: float = 0.1,
+    epsilon_decay_steps: int = 12_000,
+    post_replay_buffer_observation_preprocessing: Callable[
+        [jax.Array], jax.Array
+    ] = lambda x: x,
+) -> Tuple[DQNAgentState, JaxAgent]:
 
     if not isinstance(observation_space, Box):
         raise ValueError(
@@ -44,12 +65,10 @@ def make_full_jax_dqn(
         )
 
     # Replay Buffer
-    replay_buffer = fbx.make_flat_buffer(
+    replay_buffer = make_episode_aware_flat_buffer(
         max_length=replay_buffer_capacity,
         min_length=replay_buffer_mini_batch_size,
         sample_batch_size=replay_buffer_mini_batch_size,
-        add_sequence=False,
-        add_batch_size=1,
     )
 
     transition_data_info = create_transition_data_info(
@@ -83,14 +102,110 @@ def make_full_jax_dqn(
     target_q_value_function_variables = q_value_function_variables.copy()
 
     # Optimizer
-    # TODO continue here
+    optimizer_function = optimizer_class(**optimizer_arguments)
+    initial_optimizer_state = optimizer_function.init(q_value_function_variables)
+
+    # Epsilon-greedy schedule
+    epsilon_schedule = optax.linear_schedule(
+        init_value=epsilon_start,
+        end_value=epsilon_end,
+        transition_steps=epsilon_decay_steps,
+    )
 
     agent_state = DQNAgentState(
-        replay_buffer_func=replay_buffer,
         replay_buffer_state=replay_buffer_state,
         q_value_function_variables=q_value_function_variables,
         target_q_value_function_variables=target_q_value_function_variables,
         random_key=random_key,
+        optimizer_state=initial_optimizer_state,
+        last_action=None,
+        step_count=jnp.array(0, dtype=jnp.int32),
     )
 
-    return agent_state
+    agent_specification = DQNAgentSpecification(
+        replay_buffer=replay_buffer,
+        q_value_function=q_value_function,
+        discount=discount,
+        loss_function=loss_function,
+        minto=minto,
+        double_q=double_q,
+        optimizer=optimizer_function,
+        value_function_update_frequency=value_function_update_frequency,
+        value_function_number_of_updates=value_function_number_of_updates,
+        warm_up_steps=warm_up_steps,
+        epsilon_schedule=epsilon_schedule,
+        target_network_update_frequency=target_network_update_frequency,
+        target_network_update_tau=target_network_update_tau,
+        num_actions=action_space.n,
+        post_replay_buffer_preprocessing=post_replay_buffer_observation_preprocessing,
+    )
+
+    agent = JaxAgent(
+        step=partial(dqn_train_step, agent_specification=agent_specification),
+        reset_step=partial(
+            dqn_train_reset_step, agent_specification=agent_specification
+        ),
+        make_evaluation_agent=partial(
+            make_dqn_evaluation_agent, agent_specification=agent_specification
+        ),
+    )
+
+    return agent, agent_state
+
+
+def make(
+    observation_space: Space,
+    action_space: Space,
+    replay_buffer_capacity: int = 100_000,
+    replay_buffer_mini_batch_size: int = 128,
+    value_network_class: Any = FlaxFCDiscreteQValueFunction,
+    value_network_arguments: Dict[str, Any] = {
+        "observation_shape": constants.VALUE_PLACEHOLDER,
+        "num_actions": constants.VALUE_PLACEHOLDER,
+        "hidden_dims": (256, 256),
+    },
+    optimizer_class: Any = optax.adam,
+    optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
+    random_key: Optional[jax.Array] = None,
+    discount: float = 0.99,
+    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
+    minto: bool = True,
+    double_q: bool = False,
+    value_function_update_frequency: int = 4,
+    value_function_number_of_updates: int = 4,
+    warm_up_steps: int = 1000,
+    target_network_update_frequency: int = 250,
+    target_network_update_tau: float = 1.0,
+    epsilon_start: float = 1.0,
+    epsilon_end: float = 0.1,
+    epsilon_decay_steps: int = 12_000,
+    post_replay_buffer_observation_preprocessing: Callable[
+        [jax.Array], jax.Array
+    ] = lambda x: x,
+) -> Agent:
+    jax_agent, agent_state = make_jax_agent(
+        observation_space=observation_space,
+        action_space=action_space,
+        replay_buffer_capacity=replay_buffer_capacity,
+        replay_buffer_mini_batch_size=replay_buffer_mini_batch_size,
+        value_network_class=value_network_class,
+        value_network_arguments=value_network_arguments,
+        optimizer_class=optimizer_class,
+        optimizer_arguments=optimizer_arguments,
+        random_key=random_key,
+        discount=discount,
+        loss_function=loss_function,
+        minto=minto,
+        double_q=double_q,
+        value_function_update_frequency=value_function_update_frequency,
+        value_function_number_of_updates=value_function_number_of_updates,
+        warm_up_steps=warm_up_steps,
+        target_network_update_frequency=target_network_update_frequency,
+        target_network_update_tau=target_network_update_tau,
+        epsilon_start=epsilon_start,
+        epsilon_end=epsilon_end,
+        epsilon_decay_steps=epsilon_decay_steps,
+        post_replay_buffer_observation_preprocessing=post_replay_buffer_observation_preprocessing,
+    )
+
+    return JaxAgentWrapper(jax_agent=jax_agent, agent_state=agent_state)

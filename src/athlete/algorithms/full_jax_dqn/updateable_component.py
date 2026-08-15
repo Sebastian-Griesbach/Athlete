@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Callable, Dict, Tuple
+from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
@@ -7,7 +6,6 @@ import flax
 import optax
 
 from athlete import constants
-from athlete.jax_objects import FunctionWrapper
 from athlete.algorithms.full_jax_dqn.buffer import (
     EpisodeAwareFlatBuffer,
     EpisodeAwareFlatBufferState,
@@ -46,7 +44,7 @@ def dqn_value_update(
     optimizer: optax.GradientTransformation,
     optimizer_state: optax.OptState,
     discount: float,
-    criteria: FunctionWrapper,
+    loss_function: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
     observations: jnp.ndarray,
     actions: jnp.ndarray,
     rewards: jnp.ndarray,
@@ -98,7 +96,7 @@ def dqn_value_update(
         observations=observations,
         actions=actions,
         target=target,
-        criteria=criteria,
+        loss_function=loss_function,
     )
 
     # apply gradients
@@ -127,14 +125,14 @@ def calculate_dqn_loss(
     observations: jnp.ndarray,
     actions: jnp.ndarray,
     target: jnp.ndarray,
-    criteria: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    loss_function: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
 ) -> jnp.ndarray:
     # calculate predictions
     raw_q_values = q_value_function.apply(q_value_function_variables, observations)
     q_values = jnp.take_along_axis(raw_q_values, actions, axis=-1)
 
     # calculate loss
-    loss = criteria(q_values, target)
+    loss = loss_function(q_values, target)
     return loss, raw_q_values
 
 
@@ -167,7 +165,7 @@ def perform_n_q_value_function_updates(
     optimizer: optax.GradientTransformation,
     optimizer_state: optax.OptState,
     discount: float,
-    criteria: FunctionWrapper,
+    loss_function: Callable[[jax.Array, jax.Array], jax.Array],
     double_q: bool,
     minto: bool,
     random_key: jax.Array,
@@ -202,7 +200,7 @@ def perform_n_q_value_function_updates(
             optimizer=optimizer,
             optimizer_state=optimizer_state,
             discount=discount,
-            criteria=criteria,
+            loss_function=loss_function,
             observations=observations,
             actions=actions,
             rewards=rewards,
