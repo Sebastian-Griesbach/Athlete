@@ -4,8 +4,8 @@ import chex
 import flax
 import jax
 
-# TODO maybe make it so that instead of having eval step and eval reset step, the main agent can generate an evaluation
-# instance that than also only has step and reset step
+# TODO think about auto reset modes similar to gymnasium, agent gets two observations and immediately
+# calls step for final observation and reset step for initial observation, how exactly?
 
 
 @chex.dataclass(frozen=True)
