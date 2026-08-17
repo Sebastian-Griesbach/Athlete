@@ -7,12 +7,15 @@ import optax
 import jax.numpy as jnp
 import jax
 
-from athlete.algorithms.full_jax_dqn.agent import DQNAgentState, DQNAgentSpecification
+from athlete.algorithms.full_jax_dqn.agent_functions import (
+    DQNAgentState,
+    DQNAgentSpecification,
+)
 from athlete import constants
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
 from athlete.function import jax_mse_loss, create_transition_data_info
 
-from athlete.algorithms.full_jax_dqn.agent import (
+from athlete.algorithms.full_jax_dqn.agent_functions import (
     DQNAgentState,
     DQNAgentSpecification,
     dqn_train_step,
@@ -21,7 +24,9 @@ from athlete.algorithms.full_jax_dqn.agent import (
 )
 from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent
 from athlete.algorithms.full_jax_dqn.interface import Agent, JaxAgentWrapper
-from athlete.algorithms.full_jax_dqn.buffer import make_episode_aware_flat_buffer
+from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
+    make_episode_aware_flat_buffer,
+)
 
 
 def make_jax_agent(
@@ -40,7 +45,7 @@ def make_jax_agent(
     random_key: Optional[jax.Array] = None,
     discount: float = 0.99,
     loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
-    minto: bool = True,
+    minto: bool = False,
     double_q: bool = False,
     value_function_update_frequency: int = 4,
     value_function_number_of_updates: int = 4,
@@ -53,7 +58,10 @@ def make_jax_agent(
     post_replay_buffer_observation_preprocessing: Callable[
         [jax.Array], jax.Array
     ] = lambda x: x,
-) -> Tuple[DQNAgentState, JaxAgent]:
+    log_loss: bool = True,
+    log_mean_q_values: bool = True,
+    log_greedy_action: bool = True,
+) -> Tuple[JaxAgent, DQNAgentState]:
 
     if not isinstance(observation_space, Box):
         raise ValueError(
@@ -99,7 +107,10 @@ def make_jax_agent(
     )
 
     # Target network
-    target_q_value_function_variables = q_value_function_variables.copy()
+    target_q_value_function_variables = jax.tree.map(
+        jnp.copy,
+        q_value_function_variables,
+    )
 
     # Optimizer
     optimizer_function = optimizer_class(**optimizer_arguments)
@@ -118,7 +129,9 @@ def make_jax_agent(
         target_q_value_function_variables=target_q_value_function_variables,
         random_key=random_key,
         optimizer_state=initial_optimizer_state,
-        last_action=None,
+        last_action=jnp.array(
+            (action_space.n + 1,), dtype=jnp.int32
+        ),  # Invalid action as placeholder
         step_count=jnp.array(0, dtype=jnp.int32),
     )
 
@@ -138,6 +151,9 @@ def make_jax_agent(
         target_network_update_tau=target_network_update_tau,
         num_actions=action_space.n,
         post_replay_buffer_preprocessing=post_replay_buffer_observation_preprocessing,
+        log_loss=log_loss,
+        log_mean_q_values=log_mean_q_values,
+        log_greedy_action=log_greedy_action,
     )
 
     agent = JaxAgent(
@@ -169,7 +185,7 @@ def make(
     random_key: Optional[jax.Array] = None,
     discount: float = 0.99,
     loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
-    minto: bool = True,
+    minto: bool = False,
     double_q: bool = False,
     value_function_update_frequency: int = 4,
     value_function_number_of_updates: int = 4,
@@ -182,6 +198,9 @@ def make(
     post_replay_buffer_observation_preprocessing: Callable[
         [jax.Array], jax.Array
     ] = lambda x: x,
+    log_loss: bool = True,
+    log_mean_q_values: bool = True,
+    log_greedy_action: bool = True,
 ) -> Agent:
     jax_agent, agent_state = make_jax_agent(
         observation_space=observation_space,
@@ -206,6 +225,9 @@ def make(
         epsilon_end=epsilon_end,
         epsilon_decay_steps=epsilon_decay_steps,
         post_replay_buffer_observation_preprocessing=post_replay_buffer_observation_preprocessing,
+        log_loss=log_loss,
+        log_mean_q_values=log_mean_q_values,
+        log_greedy_action=log_greedy_action,
     )
 
     return JaxAgentWrapper(jax_agent=jax_agent, agent_state=agent_state)

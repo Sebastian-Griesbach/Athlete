@@ -1,9 +1,17 @@
-from abc import ABC, abstractmethod, classmethod
+from abc import ABC, abstractmethod
 from typing import Tuple, Any, Dict
 
 import flax
+import jax
 
 from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent, JaxEvaluationAgent
+
+# TODO maybe write a function protocol for update functions to take update condition and return logging info
+
+
+class LogValue(flax.struct.PyTreeNode):
+    value: jax.Array
+    valid: jax.Array
 
 
 class Agent(ABC):
@@ -26,8 +34,8 @@ class Agent(ABC):
     @abstractmethod
     def save_agent(self, save_path: str) -> None: ...
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def load_agent(cls, load_path: str) -> "Agent": ...
 
 
@@ -41,8 +49,8 @@ class EvaluationAgent(ABC):
     @abstractmethod
     def save_agent(self, save_path: str) -> None: ...
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def load_agent(cls, load_path: str) -> "EvaluationAgent": ...
 
 
@@ -60,21 +68,27 @@ class JaxAgentWrapper(Agent):
         **kwargs,
     ) -> Tuple[Any, Dict[str, Any]]:
         self.agent_state, action, agent_info = self.jax_agent.step(
-            self.agent_state, observation, reward, terminated, truncated
+            agent_state=self.agent_state,
+            observation=observation,
+            reward=reward,
+            terminated=terminated,
+            truncated=truncated,
         )
         return action, agent_info
 
     def reset_step(self, observation: Any, **kwargs) -> Tuple[Any, Dict[str, Any]]:
         self.agent_state, action, agent_info = self.jax_agent.reset_step(
-            self.agent_state, observation
+            agent_state=self.agent_state, observation=observation
         )
         return action, agent_info
 
     def make_evaluation_agent(self) -> "EvaluationAgent":
-        jax_eval_agent = self.jax_agent.make_evaluation_agent(
-            self.agent_state, self.agent_state
+        jax_eval_agent_state, jax_eval_agent = self.jax_agent.make_evaluation_agent(
+            agent_state=self.agent_state,
         )
-        return JaxEvaluationAgentWrapper(jax_eval_agent, self.agent_state)
+        return JaxEvaluationAgentWrapper(
+            jax_eval_agent=jax_eval_agent, agent_state=jax_eval_agent_state
+        )
 
     # TODO Save functionality, should also save state and config, upon loading rebuild agent and set state
 
@@ -88,12 +102,12 @@ class JaxEvaluationAgentWrapper(EvaluationAgent):
 
     def step(self, observation: Any, **kwargs) -> Tuple[Any, Dict[str, Any]]:
         self.agent_state, action, agent_info = self.jax_eval_agent.step(
-            self.agent_state, observation
+            agent_state=self.agent_state, observation=observation
         )
         return action, agent_info
 
     def reset_step(self, observation: Any, **kwargs) -> Tuple[Any, Dict[str, Any]]:
         self.agent_state, action, agent_info = self.jax_eval_agent.reset_step(
-            self.agent_state, observation
+            agent_state=self.agent_state, observation=observation
         )
         return action, agent_info

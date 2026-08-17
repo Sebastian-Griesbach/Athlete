@@ -30,7 +30,8 @@ class JaxAgent:
         Tuple[flax.struct.PyTreeNode, jax.Array, Dict[str, jax.Array]],
     ]
     make_evaluation_agent: Callable[
-        [flax.struct.PyTreeNode, flax.struct.PyTreeNode], "JaxEvaluationAgent"
+        [flax.struct.PyTreeNode, flax.struct.PyTreeNode],
+        Tuple[flax.struct.PyTreeNode, "JaxEvaluationAgent"],
     ]
 
 

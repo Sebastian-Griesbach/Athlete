@@ -1,8 +1,12 @@
-from typing import Callable, Tuple
+from typing import Callable, Dict, Tuple
 
 import jax
 import jax.numpy as jnp
 import flax
+
+from athlete.algorithms.full_jax_dqn.interface import LogValue
+
+GREEDY_ACTION_LOG_TAG = "greedy_action"
 
 
 def get_random_action(
@@ -19,9 +23,11 @@ def get_greedy_action(
     observation: jax.Array,
     post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> int:
+
     observation = jnp.expand_dims(observation, axis=0)
     observation = post_replay_buffer_preprocessing(observation)
     q_values = q_value_function.apply(q_value_function_variables, observation)
+
     return jnp.argmax(q_values, axis=-1)
 
 
@@ -35,9 +41,12 @@ def get_dqn_train_action(
     random_key: jax.Array,
     num_actions: int,
     post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
+    log_greedy_action: bool,
+    log_prefix: str,
 ) -> Tuple[
-    jax.Array, jax.Array, jax.Array, jax.Array
+    jax.Array, jax.Array, Dict[str, LogValue]
 ]:  # action(s), random_key, if the selected action was greedy, action_data_valid
+    log_info = {}
 
     random_key, sub_key = jax.random.split(random_key)
 
@@ -62,4 +71,23 @@ def get_dqn_train_action(
         ),
     )
 
-    return action, random_key, ~perform_random_action, jnp.array(True)
+    if log_greedy_action:
+        log_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = LogValue(
+            value=jnp.logical_not(perform_random_action),
+            valid=jnp.array(True),
+        )
+
+    return action, random_key, log_info
+
+
+def make_dqn_action_dummy_info(
+    log_greedy_action: bool, log_prefix: str
+) -> Dict[str, LogValue]:
+    dummy_logging_info = {}
+
+    if log_greedy_action:
+        dummy_logging_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = LogValue(
+            value=jnp.array(False), valid=jnp.array(False)
+        )
+
+    return dummy_logging_info

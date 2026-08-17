@@ -1,11 +1,12 @@
+from typing import Callable, NamedTuple, Any, Callable, Generic, TypeVar
 from functools import partial
-from typing import Any, Callable, Generic, TypeVar
 
 import chex
-import flax
 import jax
 import jax.numpy as jnp
-from typing_extensions import NamedTuple
+import flax
+
+from athlete import constants
 
 Experience = TypeVar("Experience")
 INDEX_DTYPE = jnp.int32
@@ -265,3 +266,28 @@ def _validate_buffer_arguments(
         raise ValueError("sample_batch_size must be at least 1.")
     if max_length >= jnp.iinfo(INDEX_DTYPE).max:
         raise ValueError("max_length is too large for int32 buffer indices.")
+
+
+def flat_replay_buffer_transition_update(
+    replay_buffer_func: EpisodeAwareFlatBuffer,
+    replay_buffer_state: EpisodeAwareFlatBufferState,
+    action: jax.Array,
+    observation: jax.Array,
+    reward: jax.Array,
+    terminated: jax.Array,
+    truncated: jax.Array,
+    new_episode_started: jax.Array,
+) -> EpisodeAwareFlatBufferState:
+    experience = {
+        constants.DATA_OBSERVATIONS: observation,
+        constants.DATA_ACTIONS: action,
+        constants.DATA_REWARDS: reward,
+        constants.DATA_TERMINATEDS: terminated,
+    }
+
+    replay_buffer_state = replay_buffer_func.add(
+        state=replay_buffer_state,
+        entry=experience,
+        new_episode_started=new_episode_started,
+    )
+    return replay_buffer_state
