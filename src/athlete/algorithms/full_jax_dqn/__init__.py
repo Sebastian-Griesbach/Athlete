@@ -35,6 +35,7 @@ from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     map_replay_buffer_dtype,
 )
 from athlete.algorithms.full_jax_dqn.function import identity, mean_squared_error
+from athlete import constants
 
 
 def make_jax_agent(
@@ -42,6 +43,8 @@ def make_jax_agent(
     action_space: Space,
     replay_buffer_capacity: int = 100_000,
     replay_buffer_mini_batch_size: int = 128,
+    replay_buffer_frame_stacking: int = 1,
+    replay_buffer_frame_stack_axis: int = 0,
     value_network_class: Any = FlaxFCDiscreteQValueFunction,
     value_network_arguments: Dict[str, Any] = {
         "observation_shape": constants.VALUE_PLACEHOLDER,
@@ -86,6 +89,9 @@ def make_jax_agent(
         max_length=replay_buffer_capacity,
         min_length=replay_buffer_mini_batch_size,
         sample_batch_size=replay_buffer_mini_batch_size,
+        frame_stacking=replay_buffer_frame_stacking,
+        frame_stacking_field=constants.DATA_OBSERVATIONS,
+        frame_stack_axis=replay_buffer_frame_stack_axis,
     )
 
     transition_data_info = create_transition_data_info(
@@ -101,18 +107,21 @@ def make_jax_agent(
     replay_buffer_state = replay_buffer.init(dummy_transition)
 
     # Value function
-    value_network_arguments["observation_shape"] = observation_space.shape
+    dummy_observation = post_replay_buffer_observation_preprocessing(
+        jnp.zeros((1, *observation_space.shape), dtype=jnp.float32)
+    )
+
+    value_network_arguments["observation_shape"] = dummy_observation.shape[1:]
     value_network_arguments["num_actions"] = action_space.n
     q_value_function = value_network_class(**value_network_arguments)
 
-    dummy_input = jnp.zeros((1, *observation_space.shape), dtype=jnp.float32)
     if random_key is None:
         random_key = jax.random.PRNGKey(random.randint(0, 2**32 - 1))
 
     random_key, sub_key = jax.random.split(random_key)
 
     q_value_function_variables = target_q_value_function_variables = (
-        q_value_function.init(sub_key, dummy_input)
+        q_value_function.init(sub_key, dummy_observation)
     )
 
     # Target network
@@ -195,6 +204,8 @@ def make(
     action_space: Space,
     replay_buffer_capacity: int = 100_000,
     replay_buffer_mini_batch_size: int = 128,
+    replay_buffer_frame_stacking: int = 1,
+    replay_buffer_frame_stack_axis: int = 0,
     value_network_class: Any = FlaxFCDiscreteQValueFunction,
     value_network_arguments: Dict[str, Any] = {
         "observation_shape": constants.VALUE_PLACEHOLDER,
@@ -228,6 +239,8 @@ def make(
         action_space=action_space,
         replay_buffer_capacity=replay_buffer_capacity,
         replay_buffer_mini_batch_size=replay_buffer_mini_batch_size,
+        replay_buffer_frame_stacking=replay_buffer_frame_stacking,
+        replay_buffer_frame_stack_axis=replay_buffer_frame_stack_axis,
         value_network_class=value_network_class,
         value_network_arguments=value_network_arguments,
         optimizer_class=optimizer_class,

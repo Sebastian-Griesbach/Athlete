@@ -33,6 +33,7 @@ def perform_n_q_value_function_updates(
     log_prefix: str,
     random_key: jax.Array,
     n_updates: int,
+    post_replay_buffer_observation_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> Tuple[
     Tuple[flax.core.FrozenDict, optax.OptState, jax.Array], Tuple[jax.Array, jax.Array]
 ]:
@@ -48,6 +49,7 @@ def perform_n_q_value_function_updates(
                 replay_buffer_func=replay_buffer_func,
                 replay_buffer_state=replay_buffer_state,
                 random_key=subkey,
+                post_replay_buffer_observation_preprocessing=post_replay_buffer_observation_preprocessing,
             )
         )
 
@@ -104,6 +106,7 @@ def get_transitions_from_flat_buffer(
     replay_buffer_func: EpisodeAwareFlatBuffer,
     replay_buffer_state: EpisodeAwareFlatBufferState,
     random_key: jax.Array,
+    post_replay_buffer_observation_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> Tuple[
     jnp.ndarray,
     jnp.ndarray,
@@ -112,10 +115,14 @@ def get_transitions_from_flat_buffer(
     jnp.ndarray,
 ]:
     batch = replay_buffer_func.sample(replay_buffer_state, random_key)
-    observations = batch.experience.first[constants.DATA_OBSERVATIONS]
+    observations = post_replay_buffer_observation_preprocessing(
+        batch.experience.first[constants.DATA_OBSERVATIONS]
+    )
     actions = batch.experience.second[constants.DATA_ACTIONS]
     rewards = batch.experience.second[constants.DATA_REWARDS]
-    next_observations = batch.experience.second[constants.DATA_OBSERVATIONS]
+    next_observations = post_replay_buffer_observation_preprocessing(
+        batch.experience.second[constants.DATA_OBSERVATIONS]
+    )
     terminateds = batch.experience.second[constants.DATA_TERMINATEDS]
     return observations, actions, rewards, next_observations, terminateds
 

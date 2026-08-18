@@ -59,7 +59,7 @@ def main():
 
     agent = full_jax_dqn.load_agent(save_path=agent_save_path)
 
-    # train(agent, env, train_steps=TRAIN_STEPS)
+    train(agent, env, train_steps=TRAIN_STEPS)
 
     if USE_NEW_AGENT:
         evaluation_agent = agent.make_evaluation_agent()

@@ -231,6 +231,7 @@ def dqn_train_step(
                 log_loss=agent_specification.log_loss,
                 log_mean_q_values=agent_specification.log_mean_q_values,
                 log_prefix="",
+                post_replay_buffer_observation_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
             ),
             lambda: (
                 q_value_function_variables,
