@@ -7,6 +7,8 @@ from tqdm import tqdm
 import time
 
 USE_NEW_AGENT = True
+TRAIN_STEPS = 50_000
+EVALUATION_EPISODES = 1
 
 
 def main():
@@ -26,27 +28,8 @@ def main():
         )
     setup_time = time.time() - start_setup_time
 
-    observation, env_info = env.reset()
-    action, agent_info = agent.reset_step(observation=observation)
-
-    train_steps = 100_000
-    episode_return = 0
     start_train_time = time.time()
-    for step in tqdm(range(train_steps)):
-        observation, reward, terminated, truncated, env_info = env.step(action)
-        episode_return += reward
-        action, agent_info = agent.step(
-            observation=observation,
-            reward=reward,
-            terminated=terminated,
-            truncated=truncated,
-        )
-
-        if terminated or truncated:
-            observation, env_info = env.reset()
-            action, agent_info = agent.reset_step(observation=observation)
-            # print(f"Episode return: {episode_return}")
-            episode_return = 0
+    train(agent, env, train_steps=TRAIN_STEPS)
 
     train_time = time.time() - start_train_time
     total_time = time.time() - start_setup_time
@@ -62,10 +45,61 @@ def main():
         agent.eval()
         evaluation_agent = agent
 
+    evaluate(
+        evaluation_agent,
+        evaluation_environment,
+        evaluation_episodes=EVALUATION_EPISODES,
+    )
+
+    agent_save_path = "jax_dqn_agent.pkl"
+    agent.save(save_path=agent_save_path)
+
+    del agent
+    del evaluation_agent
+
+    agent = full_jax_dqn.load_agent(save_path=agent_save_path)
+
+    # train(agent, env, train_steps=TRAIN_STEPS)
+
+    if USE_NEW_AGENT:
+        evaluation_agent = agent.make_evaluation_agent()
+    else:
+        agent.eval()
+        evaluation_agent = agent
+
+    evaluate(
+        evaluation_agent,
+        evaluation_environment,
+        evaluation_episodes=EVALUATION_EPISODES,
+    )
+
+
+def train(agent, environment, train_steps=100_000):
+    observation, env_info = environment.reset()
+    action, agent_info = agent.reset_step(observation=observation)
+
+    episode_return = 0
+    for step in tqdm(range(train_steps)):
+        observation, reward, terminated, truncated, env_info = environment.step(action)
+        episode_return += reward
+        action, agent_info = agent.step(
+            observation=observation,
+            reward=reward,
+            terminated=terminated,
+            truncated=truncated,
+        )
+
+        if terminated or truncated:
+            observation, env_info = environment.reset()
+            action, agent_info = agent.reset_step(observation=observation)
+            # print(f"Episode return: {episode_return}")
+            episode_return = 0
+
+
+def evaluate(evaluation_agent, evaluation_environment, evaluation_episodes=3):
     observation, env_info = evaluation_environment.reset()
     action, agent_info = evaluation_agent.reset_step(observation=observation)
 
-    evaluation_episodes = 3
     episode_returns = []
     for episode in range(evaluation_episodes):
         episode_return = 0

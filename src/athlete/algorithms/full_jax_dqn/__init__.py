@@ -1,11 +1,14 @@
 from typing import Callable, Dict, Any, Optional, Tuple
 from functools import partial
 import random
+import copy
 
 from gymnasium.spaces import Space, Box, Discrete
 import optax
 import jax.numpy as jnp
 import jax
+import pickle
+import flax
 
 from athlete.algorithms.full_jax_dqn.agent_functions import (
     DQNAgentState,
@@ -13,7 +16,7 @@ from athlete.algorithms.full_jax_dqn.agent_functions import (
 )
 from athlete import constants
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
-from athlete.function import jax_mse_loss, create_transition_data_info
+from athlete.function import create_transition_data_info
 
 from athlete.algorithms.full_jax_dqn.agent_functions import (
     DQNAgentState,
@@ -22,12 +25,16 @@ from athlete.algorithms.full_jax_dqn.agent_functions import (
     dqn_train_reset_step,
     make_dqn_evaluation_agent,
 )
-from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent
+from athlete.algorithms.full_jax_dqn.jax_interface import (
+    JaxAgent,
+    decode_references,
+)
 from athlete.algorithms.full_jax_dqn.interface import Agent, JaxAgentWrapper
 from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     make_episode_aware_flat_buffer,
     map_replay_buffer_dtype,
 )
+from athlete.algorithms.full_jax_dqn.function import identity, mean_squared_error
 
 
 def make_jax_agent(
@@ -45,7 +52,7 @@ def make_jax_agent(
     optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
     random_key: Optional[jax.Array] = None,
     discount: float = 0.99,
-    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
+    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = mean_squared_error,
     minto: bool = False,
     double_q: bool = False,
     value_function_update_frequency: int = 4,
@@ -58,11 +65,12 @@ def make_jax_agent(
     epsilon_decay_steps: int = 12_000,
     post_replay_buffer_observation_preprocessing: Callable[
         [jax.Array], jax.Array
-    ] = lambda x: x,
-    log_loss: bool = True,
-    log_mean_q_values: bool = True,
-    log_greedy_action: bool = True,
-) -> Tuple[JaxAgent, DQNAgentState]:
+    ] = identity,
+    log_loss: bool = False,
+    log_mean_q_values: bool = False,
+    log_greedy_action: bool = False,
+) -> Tuple[JaxAgent, DQNAgentState, Dict[str, Any]]:
+    make_arguments = copy.deepcopy(locals())
 
     if not isinstance(observation_space, Box):
         raise ValueError(
@@ -167,7 +175,19 @@ def make_jax_agent(
         ),
     )
 
-    return agent, agent_state
+    return agent, agent_state, make_arguments
+
+
+def load_jax_agent(save_path: str) -> Tuple[DQNAgentState, JaxAgent, Dict[str, Any]]:
+    with open(save_path, "rb") as file:
+        checkpoint = pickle.load(file)
+
+    make_arguments = decode_references(checkpoint["make_arguments"])
+    agent, agent_state, _ = make_jax_agent(**make_arguments)
+
+    agent_state = flax.serialization.from_bytes(agent_state, checkpoint["agent_state"])
+
+    return agent, agent_state, make_arguments
 
 
 def make(
@@ -185,7 +205,7 @@ def make(
     optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
     random_key: Optional[jax.Array] = None,
     discount: float = 0.99,
-    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = jax_mse_loss,
+    loss_function: Callable[[jax.Array, jax.Array], jax.Array] = mean_squared_error,
     minto: bool = False,
     double_q: bool = False,
     value_function_update_frequency: int = 4,
@@ -198,12 +218,12 @@ def make(
     epsilon_decay_steps: int = 12_000,
     post_replay_buffer_observation_preprocessing: Callable[
         [jax.Array], jax.Array
-    ] = lambda x: x,
-    log_loss: bool = True,
-    log_mean_q_values: bool = True,
-    log_greedy_action: bool = True,
+    ] = identity,
+    log_loss: bool = False,
+    log_mean_q_values: bool = False,
+    log_greedy_action: bool = False,
 ) -> Agent:
-    jax_agent, agent_state = make_jax_agent(
+    jax_agent, agent_state, make_arguments = make_jax_agent(
         observation_space=observation_space,
         action_space=action_space,
         replay_buffer_capacity=replay_buffer_capacity,
@@ -232,5 +252,19 @@ def make(
     )
 
     return JaxAgentWrapper(
-        jax_agent=jax_agent, agent_state=agent_state, action_space=action_space
+        jax_agent=jax_agent,
+        agent_state=agent_state,
+        action_space=action_space,
+        make_arguments=make_arguments,
+    )
+
+
+def load_agent(save_path: str) -> Agent:
+    jax_agent, agent_state, make_arguments = load_jax_agent(save_path)
+
+    return JaxAgentWrapper(
+        jax_agent=jax_agent,
+        agent_state=agent_state,
+        action_space=make_arguments["action_space"],
+        make_arguments=make_arguments,
     )

@@ -34,7 +34,7 @@ class Agent(ABC):
     def make_evaluation_agent(self) -> "EvaluationAgent": ...
 
     @abstractmethod
-    def save_agent(self, save_path: str) -> None: ...
+    def save(self, save_path: str) -> None: ...
 
 
 class EvaluationAgent(ABC):
@@ -45,7 +45,7 @@ class EvaluationAgent(ABC):
     def reset_step(self, observation: Any, **kwargs) -> Tuple[Any, Dict[str, Any]]: ...
 
     @abstractmethod
-    def save_agent(self, save_path: str) -> None: ...
+    def save(self, save_path: str) -> None: ...
 
 
 def convert_jax_action(action: jax.Array, action_space: gym.Space) -> Any:
@@ -65,10 +65,12 @@ class JaxAgentWrapper(Agent):
         jax_agent: JaxAgent,
         agent_state: flax.struct.PyTreeNode,
         action_space: gym.Space,
+        make_arguments: Dict[str, Any],
     ):
         self.jax_agent = jax_agent
         self.agent_state = agent_state
         self.action_space = action_space
+        self.make_arguments = make_arguments
 
     def step(
         self,
@@ -105,11 +107,12 @@ class JaxAgentWrapper(Agent):
             action_space=self.action_space,
         )
 
-    # TODO Save functionality, should also save state and config, upon loading rebuild agent and set state
-    def save_agent(self, save_path: str) -> None:
-        pass
-
-    # TODO load function should be on the same level as make function
+    def save(self, save_path: str) -> None:
+        JaxAgent.save(
+            save_path=save_path,
+            agent_state=self.agent_state,
+            make_arguments=self.make_arguments,
+        )
 
 
 class JaxEvaluationAgentWrapper(EvaluationAgent):
@@ -137,5 +140,5 @@ class JaxEvaluationAgentWrapper(EvaluationAgent):
         converted_action = convert_jax_action(action, self.action_space)
         return converted_action, agent_info
 
-    def save_agent(self, save_path: str) -> None:
+    def save(self, save_path: str) -> None:
         pass  # TODO
