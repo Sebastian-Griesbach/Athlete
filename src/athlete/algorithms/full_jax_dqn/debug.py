@@ -1,21 +1,37 @@
 import gymnasium as gym
 from athlete.algorithms import full_jax_dqn
 
+import athlete
+
 from tqdm import tqdm
+import time
+
+USE_NEW_AGENT = True
 
 
 def main():
     env = gym.make("CartPole-v1")
 
-    agent = full_jax_dqn.make(
-        observation_space=env.observation_space, action_space=env.action_space
-    )
+    start_setup_time = time.time()
+
+    if USE_NEW_AGENT:
+        agent = full_jax_dqn.make(
+            observation_space=env.observation_space, action_space=env.action_space
+        )
+    else:
+        agent = athlete.make(
+            algorithm_id="jax_dqn",
+            observation_space=env.observation_space,
+            action_space=env.action_space,
+        )
+    setup_time = time.time() - start_setup_time
 
     observation, env_info = env.reset()
     action, agent_info = agent.reset_step(observation=observation)
 
     train_steps = 100_000
     episode_return = 0
+    start_train_time = time.time()
     for step in tqdm(range(train_steps)):
         observation, reward, terminated, truncated, env_info = env.step(action)
         episode_return += reward
@@ -29,5 +45,46 @@ def main():
         if terminated or truncated:
             observation, env_info = env.reset()
             action, agent_info = agent.reset_step(observation=observation)
-            print(f"Episode return: {episode_return}")
+            # print(f"Episode return: {episode_return}")
             episode_return = 0
+
+    train_time = time.time() - start_train_time
+    total_time = time.time() - start_setup_time
+    print(f"Setup time: {setup_time:.2f} seconds")
+    print(f"Training time: {train_time:.2f} seconds")
+    print(f"Total time: {total_time:.2f} seconds")
+
+    # Evaluation
+    evaluation_environment = gym.make("CartPole-v1", render_mode="human")
+    if USE_NEW_AGENT:
+        evaluation_agent = agent.make_evaluation_agent()
+    else:
+        agent.eval()
+        evaluation_agent = agent
+
+    observation, env_info = evaluation_environment.reset()
+    action, agent_info = evaluation_agent.reset_step(observation=observation)
+
+    evaluation_episodes = 3
+    episode_returns = []
+    for episode in range(evaluation_episodes):
+        episode_return = 0
+        terminated = False
+        truncated = False
+        while not (terminated or truncated):
+            observation, reward, terminated, truncated, env_info = (
+                evaluation_environment.step(action)
+            )
+            episode_return += reward
+            action, agent_info = evaluation_agent.step(observation=observation)
+
+        observation, env_info = evaluation_environment.reset()
+        action, agent_info = evaluation_agent.reset_step(observation=observation)
+        episode_returns.append(episode_return)
+    print(
+        f"Average evaluation return: {sum(episode_returns) / len(episode_returns):.2f}"
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -321,7 +321,7 @@ def make_dqn_evaluation_agent(
     )
     evaluation_agent_specification = DQNEvaluationAgentSpecification(
         q_value_function=agent_specification.q_value_function,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
+        post_replay_buffer_observation_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
     )  # needs no copy since specification is static
 
     evaluation_agent = JaxEvaluationAgent(

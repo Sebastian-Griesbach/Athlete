@@ -26,6 +26,7 @@ from athlete.algorithms.full_jax_dqn.jax_interface import JaxAgent
 from athlete.algorithms.full_jax_dqn.interface import Agent, JaxAgentWrapper
 from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     make_episode_aware_flat_buffer,
+    map_replay_buffer_dtype,
 )
 
 
@@ -85,7 +86,7 @@ def make_jax_agent(
         flat_transition=True,
     )
     dummy_transition = {
-        field: jnp.zeros(info["shape"], dtype=info["dtype"])
+        field: jnp.zeros(info["shape"], dtype=map_replay_buffer_dtype(info["dtype"]))
         for field, info in transition_data_info.items()
     }
 
@@ -150,7 +151,7 @@ def make_jax_agent(
         target_network_update_frequency=target_network_update_frequency,
         target_network_update_tau=target_network_update_tau,
         num_actions=action_space.n,
-        post_replay_buffer_preprocessing=post_replay_buffer_observation_preprocessing,
+        post_replay_buffer_observation_preprocessing=post_replay_buffer_observation_preprocessing,
         log_loss=log_loss,
         log_mean_q_values=log_mean_q_values,
         log_greedy_action=log_greedy_action,
@@ -230,4 +231,6 @@ def make(
         log_greedy_action=log_greedy_action,
     )
 
-    return JaxAgentWrapper(jax_agent=jax_agent, agent_state=agent_state)
+    return JaxAgentWrapper(
+        jax_agent=jax_agent, agent_state=agent_state, action_space=action_space
+    )

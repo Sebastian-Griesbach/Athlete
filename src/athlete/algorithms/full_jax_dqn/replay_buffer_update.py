@@ -12,6 +12,22 @@ Experience = TypeVar("Experience")
 INDEX_DTYPE = jnp.int32
 
 
+# Map dtype families to specific jax default dtype
+def map_replay_buffer_dtype(dtype):
+    dtype = jnp.dtype(dtype)
+
+    if jnp.issubdtype(dtype, jnp.integer):
+        return jnp.int32
+
+    if jnp.issubdtype(dtype, jnp.floating):
+        return jnp.float32
+
+    if jnp.issubdtype(dtype, jnp.bool_):
+        return jnp.bool_
+
+    return dtype
+
+
 class ExperiencePair(NamedTuple, Generic[Experience]):
     first: Experience
     second: Experience
