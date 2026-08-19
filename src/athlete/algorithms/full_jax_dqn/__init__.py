@@ -10,7 +10,7 @@ import jax
 import pickle
 import flax
 
-from athlete.algorithms.full_jax_dqn.agent_functions import (
+from athlete.algorithms.full_jax_dqn.agent_function import (
     DQNAgentState,
     DQNAgentSpecification,
 )
@@ -18,7 +18,7 @@ from athlete import constants
 from athlete.module.jax.common import FlaxFCDiscreteQValueFunction
 from athlete.function import create_transition_data_info
 
-from athlete.algorithms.full_jax_dqn.agent_functions import (
+from athlete.algorithms.full_jax_dqn.agent_function import (
     DQNAgentState,
     DQNAgentSpecification,
     dqn_train_step,
@@ -55,7 +55,7 @@ def make_jax_agent(
     },
     optimizer_class: Any = optax.adam,
     optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
-    random_key: Optional[jax.Array] = None,
+    seed: Optional[int] = None,
     discount: float = 0.99,
     loss_function: Callable[[jax.Array, jax.Array], jax.Array] = mean_squared_error,
     minto: bool = False,
@@ -117,8 +117,10 @@ def make_jax_agent(
     value_network_arguments["num_actions"] = action_space.n
     q_value_function = value_network_class(**value_network_arguments)
 
-    if random_key is None:
+    if seed is None:
         random_key = jax.random.PRNGKey(random.randint(0, 2**32 - 1))
+    else:
+        random_key = jax.random.PRNGKey(seed)
 
     random_key, sub_key = jax.random.split(random_key)
 
@@ -216,7 +218,7 @@ def make_agent(
     },
     optimizer_class: Any = optax.adam,
     optimizer_arguments: Dict[str, Any] = {"learning_rate": 6.3e-4},
-    random_key: Optional[jax.Array] = None,
+    seed: Optional[int] = None,
     discount: float = 0.99,
     loss_function: Callable[[jax.Array, jax.Array], jax.Array] = mean_squared_error,
     minto: bool = False,
@@ -247,7 +249,7 @@ def make_agent(
         value_network_arguments=value_network_arguments,
         optimizer_class=optimizer_class,
         optimizer_arguments=optimizer_arguments,
-        random_key=random_key,
+        seed=seed,
         discount=discount,
         loss_function=loss_function,
         minto=minto,

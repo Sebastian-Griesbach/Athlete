@@ -21,11 +21,11 @@ def get_greedy_action(
     q_value_function: flax.linen.Module,
     q_value_function_variables: flax.core.FrozenDict,
     observation: jax.Array,
-    post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
+    post_replay_buffer_observation_preprocessing: Callable[[jax.Array], jax.Array],
 ) -> int:
 
     observation = jnp.expand_dims(observation, axis=0)
-    observation = post_replay_buffer_preprocessing(observation)
+    observation = post_replay_buffer_observation_preprocessing(observation)
     q_values = q_value_function.apply(q_value_function_variables, observation)
 
     return jnp.argmax(q_values, axis=-1)
@@ -40,7 +40,7 @@ def get_dqn_train_action(
     observation: jax.Array,
     random_key: jax.Array,
     num_actions: int,
-    post_replay_buffer_preprocessing: Callable[[jax.Array], jax.Array],
+    post_replay_buffer_observation_preprocessing: Callable[[jax.Array], jax.Array],
     log_greedy_action: bool,
     log_prefix: str,
 ) -> Tuple[
@@ -67,7 +67,7 @@ def get_dqn_train_action(
             q_value_function=q_value_function,
             q_value_function_variables=q_value_function_variables,
             observation=observation,
-            post_replay_buffer_preprocessing=post_replay_buffer_preprocessing,
+            post_replay_buffer_observation_preprocessing=post_replay_buffer_observation_preprocessing,
         ),
     )
 

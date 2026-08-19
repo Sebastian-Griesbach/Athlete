@@ -140,7 +140,7 @@ def dqn_train_reset_step(
         observation=observation,
         random_key=random_key,
         num_actions=agent_specification.num_actions,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
+        post_replay_buffer_observation_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
         log_greedy_action=agent_specification.log_greedy_action,
         log_prefix="",
     )
@@ -274,7 +274,7 @@ def dqn_train_step(
             observation=observation,
             random_key=random_key,
             num_actions=agent_specification.num_actions,
-            post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
+            post_replay_buffer_observation_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
             log_greedy_action=agent_specification.log_greedy_action,
             log_prefix="",
         ),
@@ -318,7 +318,7 @@ def make_dqn_evaluation_agent(
     )
 
     evaluation_agent_state = DQNEvaluationAgentState(
-        q_value_function_variables=copied_q_value_function_variables
+        q_value_function_variables=copied_q_value_function_variables,
     )
     evaluation_agent_specification = DQNEvaluationAgentSpecification(
         q_value_function=agent_specification.q_value_function,
@@ -344,17 +344,17 @@ def make_dqn_evaluation_agent(
     donate_argnames=("agent_state",),
 )
 def dqn_eval_step(
-    agent_specification: DQNAgentSpecification,
-    agent_state: DQNAgentState,
+    agent_specification: DQNEvaluationAgentSpecification,
+    agent_state: DQNEvaluationAgentState,
     observation: jax.Array,
-) -> Tuple[DQNAgentState, jax.Array, Dict[str, LogValue]]:
+) -> Tuple[DQNEvaluationAgentState, jax.Array, Dict[str, LogValue]]:
     observation = jnp.asarray(observation)
 
     action = get_greedy_action(
         q_value_function=agent_specification.q_value_function,
         q_value_function_variables=agent_state.q_value_function_variables,
         observation=observation,
-        post_replay_buffer_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
+        post_replay_buffer_observation_preprocessing=agent_specification.post_replay_buffer_observation_preprocessing,
     )
 
     # For DQN agent state is unchanged during evaluation
