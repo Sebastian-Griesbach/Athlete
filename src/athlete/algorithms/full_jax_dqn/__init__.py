@@ -37,6 +37,8 @@ from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
 from athlete.algorithms.full_jax_dqn.function import identity, mean_squared_error
 from athlete import constants
 
+# TODO Consider only taking observation and action shape and dtypes as arguments to remove gymnasium dependency
+
 
 def make_jax_agent(
     observation_space: Space,
