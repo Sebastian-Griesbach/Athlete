@@ -9,7 +9,7 @@ from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     EpisodeAwareFlatBuffer,
     EpisodeAwareFlatBufferState,
 )
-from athlete.algorithms.full_jax_dqn.interface import LogValue
+from athlete.algorithms.full_jax_dqn.jax_interface import InfoValue
 from athlete import constants
 
 LOSS_LOG_TAG = "loss"
@@ -90,7 +90,7 @@ def perform_n_q_value_function_updates(
     )
 
     aggregated_log_info = jax.tree.map(
-        lambda values: LogValue(value=values.mean(axis=0), valid=jnp.array(True)),
+        lambda values: InfoValue(value=values.mean(axis=0), valid=jnp.array(True)),
         log_infos,
     )
 
@@ -148,7 +148,7 @@ def dqn_value_update(
 ) -> Tuple[  # new variables, new optimizer state, loss and mean q values for logging
     flax.core.FrozenDict,
     optax.OptState,
-    Dict[str, LogValue],
+    Dict[str, InfoValue],
 ]:
 
     raw_target_next_q_values = q_value_function.apply(
@@ -233,15 +233,15 @@ def calculate_dqn_loss(
 
 def make_dqn_value_update_dummy_log_info(
     log_loss: bool, log_mean_q_values: bool, log_prefix: str
-) -> Dict[str, LogValue]:
+) -> Dict[str, InfoValue]:
     dummy_logging_info = {}
 
     if log_loss:
-        dummy_logging_info[f"{log_prefix}{LOSS_LOG_TAG}"] = LogValue(
+        dummy_logging_info[f"{log_prefix}{LOSS_LOG_TAG}"] = InfoValue(
             value=jnp.nan, valid=jnp.array(False)
         )
     if log_mean_q_values:
-        dummy_logging_info[f"{log_prefix}{MEAN_Q_VALUES_LOG_TAG}"] = LogValue(
+        dummy_logging_info[f"{log_prefix}{MEAN_Q_VALUES_LOG_TAG}"] = InfoValue(
             value=jnp.nan, valid=jnp.array(False)
         )
 

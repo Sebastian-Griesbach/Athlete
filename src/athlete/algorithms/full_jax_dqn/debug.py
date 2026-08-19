@@ -1,5 +1,6 @@
 import gymnasium as gym
 from athlete.algorithms import full_jax_dqn
+from athlete.algorithms.full_jax_dqn.jax_agent_wrapper import JaxAgentWrapper
 
 import athlete
 
@@ -57,7 +58,7 @@ def main():
     del agent
     del evaluation_agent
 
-    agent = full_jax_dqn.load_agent(save_path=agent_save_path)
+    agent = JaxAgentWrapper.load(load_path=agent_save_path)
 
     train(agent, env, train_steps=TRAIN_STEPS)
 

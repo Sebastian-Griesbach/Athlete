@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import flax
 
-from athlete.algorithms.full_jax_dqn.interface import LogValue
+from athlete.algorithms.full_jax_dqn.jax_interface import InfoValue
 
 GREEDY_ACTION_LOG_TAG = "greedy_action"
 
@@ -44,7 +44,7 @@ def get_dqn_train_action(
     log_greedy_action: bool,
     log_prefix: str,
 ) -> Tuple[
-    jax.Array, jax.Array, Dict[str, LogValue]
+    jax.Array, jax.Array, Dict[str, InfoValue]
 ]:  # action(s), random_key, if the selected action was greedy, action_data_valid
     log_info = {}
 
@@ -72,7 +72,7 @@ def get_dqn_train_action(
     )
 
     if log_greedy_action:
-        log_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = LogValue(
+        log_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = InfoValue(
             value=jnp.logical_not(perform_random_action),
             valid=jnp.array(True),
         )
@@ -82,11 +82,11 @@ def get_dqn_train_action(
 
 def make_dqn_action_dummy_info(
     log_greedy_action: bool, log_prefix: str
-) -> Dict[str, LogValue]:
+) -> Dict[str, InfoValue]:
     dummy_logging_info = {}
 
     if log_greedy_action:
-        dummy_logging_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = LogValue(
+        dummy_logging_info[f"{log_prefix}{GREEDY_ACTION_LOG_TAG}"] = InfoValue(
             value=jnp.array(False), valid=jnp.array(False)
         )
 

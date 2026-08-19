@@ -7,8 +7,6 @@ from gymnasium.spaces import Space, Box, Discrete
 import optax
 import jax.numpy as jnp
 import jax
-import pickle
-import flax
 
 from athlete.algorithms.full_jax_dqn.agent_function import (
     DQNAgentState,
@@ -27,17 +25,28 @@ from athlete.algorithms.full_jax_dqn.agent_function import (
 )
 from athlete.algorithms.full_jax_dqn.jax_interface import (
     JaxAgent,
-    decode_references,
+    JaxMakeSpecification,
 )
-from athlete.algorithms.full_jax_dqn.interface import Agent, JaxAgentWrapper
+from athlete.algorithms.full_jax_dqn.interface import (
+    Agent,
+)
+from athlete.algorithms.full_jax_dqn.jax_agent_wrapper import (
+    JaxAgentWrapper,
+)
 from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     make_episode_aware_flat_buffer,
     map_replay_buffer_dtype,
 )
-from athlete.algorithms.full_jax_dqn.function import identity, mean_squared_error
+from athlete.algorithms.full_jax_dqn.function import (
+    identity,
+    mean_squared_error,
+    freeze_static_config,
+)
 from athlete import constants
 
 # TODO Consider only taking observation and action shape and dtypes as arguments to remove gymnasium dependency
+
+# TODO maybe also add the load function back here again (just import and assign) so all the methods to create an agent of this algorithm are in one place
 
 
 def make_jax_agent(
@@ -74,7 +83,7 @@ def make_jax_agent(
     log_loss: bool = False,
     log_mean_q_values: bool = False,
     log_greedy_action: bool = False,
-) -> Tuple[JaxAgent, DQNAgentState, Dict[str, Any]]:
+) -> Tuple[JaxAgent, DQNAgentState, JaxMakeSpecification]:
     make_arguments = copy.deepcopy(locals())
 
     if not isinstance(observation_space, Box):
@@ -115,7 +124,8 @@ def make_jax_agent(
 
     value_network_arguments["observation_shape"] = dummy_observation.shape[1:]
     value_network_arguments["num_actions"] = action_space.n
-    q_value_function = value_network_class(**value_network_arguments)
+    frozen_value_network_arguments = freeze_static_config(value_network_arguments)
+    q_value_function = value_network_class(**frozen_value_network_arguments)
 
     if seed is None:
         random_key = jax.random.PRNGKey(random.randint(0, 2**32 - 1))
@@ -135,7 +145,8 @@ def make_jax_agent(
     )
 
     # Optimizer
-    optimizer_function = optimizer_class(**optimizer_arguments)
+    frozen_optimizer_arguments = freeze_static_config(optimizer_arguments)
+    optimizer_function = optimizer_class(**frozen_optimizer_arguments)
     initial_optimizer_state = optimizer_function.init(q_value_function_variables)
 
     # Epsilon-greedy schedule
@@ -188,19 +199,12 @@ def make_jax_agent(
         ),
     )
 
-    return agent, agent_state, make_arguments
+    make_specification = JaxMakeSpecification(
+        make_function_path=f"{make_jax_agent.__module__}.{make_jax_agent.__qualname__}",
+        make_arguments=make_arguments,
+    )
 
-
-def load_jax_agent(save_path: str) -> Tuple[DQNAgentState, JaxAgent, Dict[str, Any]]:
-    with open(save_path, "rb") as file:
-        checkpoint = pickle.load(file)
-
-    make_arguments = decode_references(checkpoint["make_arguments"])
-    agent, agent_state, _ = make_jax_agent(**make_arguments)
-
-    agent_state = flax.serialization.from_bytes(agent_state, checkpoint["agent_state"])
-
-    return agent, agent_state, make_arguments
+    return agent, agent_state, make_specification
 
 
 def make_agent(
@@ -238,7 +242,8 @@ def make_agent(
     log_mean_q_values: bool = False,
     log_greedy_action: bool = False,
 ) -> Agent:
-    jax_agent, agent_state, make_arguments = make_jax_agent(
+
+    jax_agent, agent_state, make_specification = make_jax_agent(
         observation_space=observation_space,
         action_space=action_space,
         replay_buffer_capacity=replay_buffer_capacity,
@@ -272,16 +277,5 @@ def make_agent(
         jax_agent=jax_agent,
         agent_state=agent_state,
         action_space=action_space,
-        make_arguments=make_arguments,
-    )
-
-
-def load_agent(save_path: str) -> Agent:
-    jax_agent, agent_state, make_arguments = load_jax_agent(save_path)
-
-    return JaxAgentWrapper(
-        jax_agent=jax_agent,
-        agent_state=agent_state,
-        action_space=make_arguments["action_space"],
-        make_arguments=make_arguments,
+        make_specification=make_specification,
     )

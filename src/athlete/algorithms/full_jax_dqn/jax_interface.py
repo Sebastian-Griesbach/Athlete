@@ -1,6 +1,6 @@
-from typing import Callable, Dict, Tuple
-import inspect
+from typing import Callable, Dict, Tuple, Any, Optional
 import importlib
+from dataclasses import dataclass
 
 import chex
 import flax
@@ -9,6 +9,23 @@ import pickle
 
 # TODO think about auto reset modes similar to gymnasium, agent gets two observations and immediately
 # calls step for final observation and reset step for initial observation, how exactly?
+
+
+class InfoValue(flax.struct.PyTreeNode):
+    value: jax.Array
+    valid: jax.Array
+
+
+@dataclass
+class JaxMakeSpecification:
+    make_function_path: str
+    make_arguments: Dict[str, Any]
+
+
+@dataclass
+class JaxAgentCheckpoint:
+    agent_state_bytes: bytes
+    make_specification: JaxMakeSpecification
 
 
 @chex.dataclass(frozen=True)
@@ -39,14 +56,53 @@ class JaxAgent:
 
     @staticmethod
     def save(
-        save_path: str, agent_state: flax.struct.PyTreeNode, make_arguments: Dict
+        save_path: str,
+        agent_state: flax.struct.PyTreeNode,
+        make_specification: JaxMakeSpecification,
     ) -> None:
-        checkpoint = {
-            "agent_state": flax.serialization.to_bytes(agent_state),
-            "make_arguments": encode_references(make_arguments),
-        }
+
+        # create a copy to avoid changing meta data of the running original
+        encoded_make_specification = JaxMakeSpecification(
+            make_function_path=make_specification.make_function_path,
+            make_arguments=encode_references(make_specification.make_arguments),
+        )
+        checkpoint = JaxAgentCheckpoint(
+            make_specification=encoded_make_specification,
+            agent_state_bytes=flax.serialization.to_bytes(agent_state),
+        )
         with open(save_path, "wb") as file:
             pickle.dump(checkpoint, file)
+
+
+def load_jax_agent(
+    load_path: str,
+) -> Tuple[JaxAgent, flax.struct.PyTreeNode, JaxMakeSpecification]:
+    with open(load_path, "rb") as file:
+        checkpoint: JaxAgentCheckpoint = pickle.load(file)
+
+    agent_state_bytes = checkpoint.agent_state_bytes
+    make_specification = checkpoint.make_specification
+    # During runtime we keep class and object references in the make_arguments
+
+    make_arguments = decode_references(make_specification.make_arguments)
+    make_specification.make_arguments = make_arguments
+
+    make_function_path = make_specification.make_function_path
+    module_path, function_name = make_function_path.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    make_function = getattr(module, function_name)
+
+    # avoid having two agent states on GPU at the same time in case they are large
+    with jax.default_device(jax.devices("cpu")[0]):
+        agent, template_state, _ = make_function(**make_arguments)
+        loaded_state = flax.serialization.from_bytes(
+            template_state,
+            agent_state_bytes,
+        )
+
+    agent_state = jax.device_put(loaded_state)
+
+    return agent, agent_state, make_specification
 
 
 @chex.dataclass(frozen=True)

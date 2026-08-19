@@ -21,8 +21,7 @@ from athlete.algorithms.full_jax_dqn.policy import (
     get_greedy_action,
     make_dqn_action_dummy_info,
 )
-from athlete.algorithms.full_jax_dqn.jax_interface import JaxEvaluationAgent
-from athlete.algorithms.full_jax_dqn.interface import LogValue
+from athlete.algorithms.full_jax_dqn.jax_interface import JaxEvaluationAgent, InfoValue
 
 
 class DQNAgentState(flax.struct.PyTreeNode):
@@ -95,7 +94,7 @@ def dqn_train_reset_step(
     agent_specification: DQNAgentSpecification,
     agent_state: DQNAgentState,
     observation: jax.Array,
-) -> Tuple[DQNAgentState, jax.Array, Dict[str, LogValue]]:
+) -> Tuple[DQNAgentState, jax.Array, Dict[str, InfoValue]]:
     observation = jnp.asarray(observation)
 
     agent_info = {}
@@ -168,7 +167,7 @@ def dqn_train_step(
     reward: jax.Array,
     terminated: jax.Array,
     truncated: jax.Array,  # Not needed but should be part of the interface
-) -> Tuple[DQNAgentState, jax.Array, Dict[str, LogValue]]:
+) -> Tuple[DQNAgentState, jax.Array, Dict[str, InfoValue]]:
 
     agent_info = {}  # For logging
 
@@ -347,7 +346,7 @@ def dqn_eval_step(
     agent_specification: DQNEvaluationAgentSpecification,
     agent_state: DQNEvaluationAgentState,
     observation: jax.Array,
-) -> Tuple[DQNEvaluationAgentState, jax.Array, Dict[str, LogValue]]:
+) -> Tuple[DQNEvaluationAgentState, jax.Array, Dict[str, InfoValue]]:
     observation = jnp.asarray(observation)
 
     action = get_greedy_action(
