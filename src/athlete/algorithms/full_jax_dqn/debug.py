@@ -17,7 +17,7 @@ def main():
     start_setup_time = time.time()
 
     if USE_NEW_AGENT:
-        agent = full_jax_dqn.make(
+        agent = full_jax_dqn.make_agent(
             observation_space=env.observation_space, action_space=env.action_space
         )
     else:

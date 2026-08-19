@@ -201,7 +201,7 @@ def load_jax_agent(save_path: str) -> Tuple[DQNAgentState, JaxAgent, Dict[str, A
     return agent, agent_state, make_arguments
 
 
-def make(
+def make_agent(
     observation_space: Space,
     action_space: Space,
     replay_buffer_capacity: int = 100_000,
