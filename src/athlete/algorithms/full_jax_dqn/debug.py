@@ -53,12 +53,12 @@ def main():
     )
 
     agent_save_path = "jax_dqn_agent.pkl"
-    agent.save(save_path=agent_save_path)
+    agent.save_to_file(save_path=agent_save_path)
 
     del agent
     del evaluation_agent
 
-    agent = JaxAgentWrapper.load(load_path=agent_save_path)
+    agent = JaxAgentWrapper.load_from_file(load_path=agent_save_path)
 
     train(agent, env, train_steps=TRAIN_STEPS)
 

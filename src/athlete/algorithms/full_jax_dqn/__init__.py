@@ -44,6 +44,8 @@ from athlete.algorithms.full_jax_dqn.function import (
 )
 from athlete import constants
 
+# TODO maybe have different file to define all the functions and only expose those here which are supposed to be part of the "surface"
+
 # TODO Consider only taking observation and action shape and dtypes as arguments to remove gymnasium dependency
 
 # TODO maybe also add the load function back here again (just import and assign) so all the methods to create an agent of this algorithm are in one place
@@ -122,8 +124,14 @@ def make_jax_agent(
         jnp.zeros((1, *observation_space.shape), dtype=jnp.float32)
     )
 
-    value_network_arguments["observation_shape"] = dummy_observation.shape[1:]
-    value_network_arguments["num_actions"] = action_space.n
+    # create new dictionary to avoid in place mutation
+    value_network_arguments = {
+        **value_network_arguments,
+        "observation_shape": dummy_observation.shape[1:],
+        "num_actions": action_space.n,
+    }
+
+    # Freeze dictionary to enable static configuration for jax
     frozen_value_network_arguments = freeze_static_config(value_network_arguments)
     q_value_function = value_network_class(**frozen_value_network_arguments)
 

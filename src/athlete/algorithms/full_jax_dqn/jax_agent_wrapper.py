@@ -14,7 +14,7 @@ from athlete.algorithms.full_jax_dqn.jax_interface import (
     JaxEvaluationAgent,
     InfoValue,
     JaxMakeSpecification,
-    load_jax_agent,
+    JaxAgentCheckpointPayload,
 )
 
 
@@ -95,19 +95,18 @@ class JaxAgentWrapper(Agent):
             action_space=self.action_space,
         )
 
-    def save(self, save_path: str) -> None:
-        JaxAgent.save(
-            save_path=save_path,
+    def get_save_payload(self) -> JaxAgentCheckpointPayload:
+        return JaxAgent.get_save_payload(
             agent_state=self.agent_state,
             make_specification=self.make_specification,
         )
 
     @classmethod
-    def load(
+    def load_from_payload(
         cls,
-        load_path: str,
+        payload: JaxAgentCheckpointPayload,
     ) -> "JaxAgentWrapper":
-        agent, agent_state, make_specification = load_jax_agent(load_path)
+        agent, agent_state, make_specification = JaxAgent.load_from_payload(payload)
         return cls(
             jax_agent=agent,
             agent_state=agent_state,

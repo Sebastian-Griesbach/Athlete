@@ -23,7 +23,7 @@ class JaxMakeSpecification:
 
 
 @dataclass
-class JaxAgentCheckpoint:
+class JaxAgentCheckpointPayload:
     agent_state_bytes: bytes
     make_specification: JaxMakeSpecification
 
@@ -55,54 +55,77 @@ class JaxAgent:
     ]
 
     @staticmethod
-    def save(
+    def save_to_file(
         save_path: str,
         agent_state: flax.struct.PyTreeNode,
         make_specification: JaxMakeSpecification,
     ) -> None:
+        payload = JaxAgent.get_save_payload(
+            agent_state=agent_state,
+            make_specification=make_specification,
+        )
+
+        with open(save_path, "wb") as file:
+            pickle.dump(payload, file)
+
+    @staticmethod
+    def get_save_payload(
+        agent_state: flax.struct.PyTreeNode,
+        make_specification: JaxMakeSpecification,
+    ) -> JaxAgentCheckpointPayload:
 
         # create a copy to avoid changing meta data of the running original
         encoded_make_specification = JaxMakeSpecification(
             make_function_path=make_specification.make_function_path,
             make_arguments=encode_references(make_specification.make_arguments),
         )
-        checkpoint = JaxAgentCheckpoint(
+        payload = JaxAgentCheckpointPayload(
             make_specification=encoded_make_specification,
             agent_state_bytes=flax.serialization.to_bytes(agent_state),
         )
-        with open(save_path, "wb") as file:
-            pickle.dump(checkpoint, file)
+        return payload
 
+    @staticmethod
+    def load_from_file(
+        load_path: str,
+    ):
+        with open(load_path, "rb") as file:
+            payload: JaxAgentCheckpointPayload = pickle.load(file)
+        return JaxAgent.load_from_payload(payload=payload)
 
-def load_jax_agent(
-    load_path: str,
-) -> Tuple[JaxAgent, flax.struct.PyTreeNode, JaxMakeSpecification]:
-    with open(load_path, "rb") as file:
-        checkpoint: JaxAgentCheckpoint = pickle.load(file)
+    @staticmethod
+    def load_from_payload(
+        payload: JaxAgentCheckpointPayload,
+    ) -> Tuple["JaxAgent", flax.struct.PyTreeNode, JaxMakeSpecification]:
 
-    agent_state_bytes = checkpoint.agent_state_bytes
-    make_specification = checkpoint.make_specification
-    # During runtime we keep class and object references in the make_arguments
+        agent_state_bytes = payload.agent_state_bytes
+        make_specification = payload.make_specification
+        # During runtime we keep class and object references in the make_arguments
 
-    make_arguments = decode_references(make_specification.make_arguments)
-    make_specification.make_arguments = make_arguments
-
-    make_function_path = make_specification.make_function_path
-    module_path, function_name = make_function_path.rsplit(".", 1)
-    module = importlib.import_module(module_path)
-    make_function = getattr(module, function_name)
-
-    # avoid having two agent states on GPU at the same time in case they are large
-    with jax.default_device(jax.devices("cpu")[0]):
-        agent, template_state, _ = make_function(**make_arguments)
-        loaded_state = flax.serialization.from_bytes(
-            template_state,
-            agent_state_bytes,
+        # Do not change payload in place but make a copy for decoding
+        decoded_make_specification = JaxMakeSpecification(
+            make_function_path=make_specification.make_function_path,
+            make_arguments=decode_references(make_specification.make_arguments),
         )
 
-    agent_state = jax.device_put(loaded_state)
+        make_function_path = make_specification.make_function_path
+        module_path, function_name = make_function_path.rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        make_function = getattr(module, function_name)
 
-    return agent, agent_state, make_specification
+        # avoid having two agent states on GPU at the same time in case they are large
+        with jax.default_device(jax.devices("cpu")[0]):
+            agent, template_state, _ = make_function(
+                **decoded_make_specification.make_arguments
+            )
+            loaded_state = flax.serialization.from_bytes(
+                template_state,
+                agent_state_bytes,
+            )
+
+        agent_state = jax.device_put(loaded_state)
+
+        return agent, agent_state, decoded_make_specification
 
 
 @chex.dataclass(frozen=True)
