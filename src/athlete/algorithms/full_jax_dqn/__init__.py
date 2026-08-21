@@ -3,6 +3,7 @@ from functools import partial
 import random
 import copy
 
+import flax
 from gymnasium.spaces import Space, Box, Discrete
 import optax
 import jax.numpy as jnp
@@ -142,8 +143,8 @@ def make_jax_agent(
 
     random_key, sub_key = jax.random.split(random_key)
 
-    q_value_function_variables = target_q_value_function_variables = (
-        q_value_function.init(sub_key, dummy_observation)
+    q_value_function_variables = flax.core.freeze(
+        (q_value_function.init(sub_key, dummy_observation))
     )
 
     # Target network
@@ -155,7 +156,9 @@ def make_jax_agent(
     # Optimizer
     frozen_optimizer_arguments = freeze_static_config(optimizer_arguments)
     optimizer_function = optimizer_class(**frozen_optimizer_arguments)
-    initial_optimizer_state = optimizer_function.init(q_value_function_variables)
+    initial_optimizer_state = optimizer_function.init(
+        q_value_function_variables["params"]
+    )
 
     # Epsilon-greedy schedule
     epsilon_schedule = optax.linear_schedule(

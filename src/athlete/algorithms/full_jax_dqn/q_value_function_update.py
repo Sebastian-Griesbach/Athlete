@@ -10,6 +10,7 @@ from athlete.algorithms.full_jax_dqn.replay_buffer_update import (
     EpisodeAwareFlatBufferState,
 )
 from athlete.algorithms.full_jax_dqn.jax_interface import InfoValue
+from athlete.algorithms.full_jax_dqn.function import gradient_update_with_auxiliary
 from athlete import constants
 
 LOSS_LOG_TAG = "loss"
@@ -179,25 +180,19 @@ def dqn_value_update(
     not_terminateds = jnp.logical_not(terminateds)
     target = rewards + not_terminateds * discount * target_next_q_values
 
-    # calculate loss
-    (loss, raw_q_values), gradients = jax.value_and_grad(
-        calculate_dqn_loss, has_aux=True
-    )(
-        q_value_function_variables,
-        q_value_function=q_value_function,
-        observations=observations,
-        actions=actions,
-        target=target,
-        loss_function=loss_function,
-    )
-
-    # apply gradients
-    updates, optimizer_state = optimizer.update(
-        gradients, optimizer_state, q_value_function_variables
-    )
-
-    q_value_function_variables = optax.apply_updates(
-        q_value_function_variables, updates
+    # Update based on loss
+    q_value_function_variables, optimizer_state, loss, raw_q_values = (
+        gradient_update_with_auxiliary(
+            variables=q_value_function_variables,
+            optimizer_state=optimizer_state,
+            optimizer=optimizer,
+            differentiated_loss_function=calculate_dqn_loss,
+            q_value_function=q_value_function,
+            observations=observations,
+            actions=actions,
+            target=target,
+            loss_function=loss_function,
+        )
     )
 
     # for logging
