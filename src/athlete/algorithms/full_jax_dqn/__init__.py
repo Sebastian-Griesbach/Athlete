@@ -162,6 +162,7 @@ def make_jax_agent(
         init_value=epsilon_start,
         end_value=epsilon_end,
         transition_steps=epsilon_decay_steps,
+        transition_begin=warm_up_steps,
     )
 
     agent_state = DQNAgentState(
