@@ -51,7 +51,7 @@ class JaxAgentWrapper(Agent):
             self._log_keys = tuple(agent_info.keys())
 
         return {
-            key: log_value.value
+            key: log_value.value.item()
             for key in self._log_keys
             if bool((log_value := agent_info[key]).valid)
         }
@@ -135,7 +135,7 @@ class JaxEvaluationAgentWrapper(EvaluationAgent):
             self._log_keys = tuple(agent_info.keys())
 
         return {
-            key: log_value.value
+            key: log_value.value.item()
             for key in self._log_keys
             if bool((log_value := agent_info[key]).valid)
         }
