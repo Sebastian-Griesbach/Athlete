@@ -1,7 +1,6 @@
 from typing import Callable, Dict, Any, Optional, Tuple
 from functools import partial
 import random
-import copy
 
 import flax
 from gymnasium.spaces import Space, Box, Discrete
@@ -42,6 +41,7 @@ from athlete.algorithms.full_jax_dqn.function import (
     identity,
     mean_squared_error,
     freeze_static_config,
+    deepcopy_preserving_callables,
 )
 from athlete import constants
 
@@ -87,7 +87,7 @@ def make_jax_agent(
     log_mean_q_values: bool = False,
     log_greedy_action: bool = False,
 ) -> Tuple[JaxAgent, DQNAgentState, JaxMakeSpecification]:
-    make_arguments = copy.deepcopy(locals())
+    make_arguments = deepcopy_preserving_callables(locals())
 
     if not isinstance(observation_space, Box):
         raise ValueError(

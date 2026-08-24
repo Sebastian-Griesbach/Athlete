@@ -1,10 +1,10 @@
 from typing import Any, Callable
 
+import copy
 import jax.numpy as jnp
-from flax.core import freeze, copy
+import flax
 import optax
 import jax
-import flax
 
 
 def identity(x):
@@ -15,10 +15,24 @@ def mean_squared_error(predictions: jnp.ndarray, targets: jnp.ndarray) -> jnp.nd
     return jnp.mean((predictions - targets) ** 2)
 
 
+# TODO maybe make this part of a fixed jax make function construct instead of doing it manually in every make function
+def deepcopy_preserving_callables(value):
+    leaves = jax.tree_util.tree_leaves(
+        value,
+        is_leaf=callable,
+    )
+
+    callable_memo = {id(leaf): leaf for leaf in leaves if callable(leaf)}
+
+    return copy.deepcopy(value, memo=callable_memo)
+
+
 # Recursively freezes collections so they are save to use as agent specification
 def freeze_static_config(value):
     if isinstance(value, dict):
-        return freeze({key: freeze_static_config(item) for key, item in value.items()})
+        return flax.core.freeze(
+            {key: freeze_static_config(item) for key, item in value.items()}
+        )
 
     if isinstance(value, list):
         return tuple(freeze_static_config(item) for item in value)
@@ -39,7 +53,7 @@ def gradient_update(
     parameters = variables["params"]  # makes sure that only parameters are updated
 
     def loss_from_parameters(parameters: flax.core.FrozenDict) -> jnp.ndarray:
-        complete_variables = copy(
+        complete_variables = flax.core.copy(
             variables,
             {"params": parameters},
         )
@@ -71,7 +85,7 @@ def gradient_update_with_auxiliary(
     parameters = variables["params"]
 
     def loss_from_parameters(parameters: flax.core.FrozenDict) -> jnp.ndarray:
-        complete_variables = copy(
+        complete_variables = flax.core.copy(
             variables,
             {"params": parameters},
         )
