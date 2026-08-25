@@ -30,10 +30,10 @@ class DQNAgentState(flax.struct.PyTreeNode):
     )
     last_action: jax.Array = flax.struct.field(pytree_node=True)
     random_key: jax.Array = flax.struct.field(pytree_node=True)
-    q_value_function_variables: Dict[str, jax.Array] = flax.struct.field(
+    q_value_function_variables: flax.core.FrozenDict = flax.struct.field(
         pytree_node=True
     )
-    target_q_value_function_variables: Dict[str, jax.Array] = flax.struct.field(
+    target_q_value_function_variables: flax.core.FrozenDict = flax.struct.field(
         pytree_node=True
     )
     optimizer_state: optax.OptState = flax.struct.field(pytree_node=True)
@@ -41,7 +41,7 @@ class DQNAgentState(flax.struct.PyTreeNode):
 
 
 class DQNEvaluationAgentState(flax.struct.PyTreeNode):
-    q_value_function_variables: Dict[str, jax.Array] = flax.struct.field(
+    q_value_function_variables: flax.core.FrozenDict = flax.struct.field(
         pytree_node=True
     )
 
