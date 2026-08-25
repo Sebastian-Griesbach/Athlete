@@ -35,13 +35,12 @@ def perform_n_q_value_function_updates(
     random_key: jax.Array,
     n_updates: int,
     post_replay_buffer_observation_preprocessing: Callable[[jax.Array], jax.Array],
-) -> Tuple[
-    Tuple[flax.core.FrozenDict, optax.OptState, jax.Array], Tuple[jax.Array, jax.Array]
-]:
+) -> Tuple[flax.core.FrozenDict, optax.OptState, jax.Array, Dict[str, InfoValue]]:
 
-    def sample_flat_buffer_and_update_q_value_function(carry, _) -> Tuple[
-        Tuple[flax.core.FrozenDict, optax.OptState, jax.Array],
-        Tuple[jax.Array, jax.Array],
+    def sample_flat_buffer_and_update_q_value_function(
+        carry, _
+    ) -> Tuple[
+        Tuple[flax.core.FrozenDict, optax.OptState, jax.Array], Dict[str, jnp.ndarray]
     ]:
         q_value_function_variables, optimizer_state, random_key = carry
         random_key, subkey = jax.random.split(random_key)
@@ -149,7 +148,7 @@ def dqn_value_update(
 ) -> Tuple[  # new variables, new optimizer state, loss and mean q values for logging
     flax.core.FrozenDict,
     optax.OptState,
-    Dict[str, InfoValue],
+    Dict[str, jnp.ndarray],
 ]:
 
     raw_target_next_q_values = q_value_function.apply(
@@ -216,7 +215,7 @@ def calculate_dqn_loss(
     actions: jnp.ndarray,
     target: jnp.ndarray,
     loss_function: Callable[[jnp.ndarray, jnp.ndarray], jnp.ndarray],
-) -> jnp.ndarray:
+) -> Tuple[jnp.ndarray, jnp.ndarray]:
     # calculate predictions
     raw_q_values = q_value_function.apply(q_value_function_variables, observations)
     q_values = jnp.take_along_axis(raw_q_values, actions, axis=-1)
