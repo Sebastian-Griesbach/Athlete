@@ -250,7 +250,7 @@ class RNGHandler:
         """
 
         if not seed:
-            seed = int(np.random.randint(low=0, high=np.iinfo(np.uint32).max))
+            seed = int(np.random.randint(low=0, high=np.iinfo(np.int32).max))
         self.seed = seed
 
         # For convenience this ensures reproducibility for functions that do not use the global rng but numpy or torch
