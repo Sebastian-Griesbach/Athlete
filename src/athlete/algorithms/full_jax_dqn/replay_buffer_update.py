@@ -232,28 +232,21 @@ def sample(
     first_ids = state.valid_ids[valid_id_positions]
     second_ids = (first_ids + 1) % max_length
 
-    first = jax.tree.map(lambda leaf: leaf[first_ids], state.experience)
-    second = jax.tree.map(lambda leaf: leaf[second_ids], state.experience)
-    first = _replace_frame_stacked_sample(
-        state=state,
-        sample=first,
-        entry_ids=first_ids,
-        max_length=max_length,
-        frame_stacking=frame_stacking,
-        frame_stacking_field=frame_stacking_field,
-        frame_stack_axis=frame_stack_axis,
+    experience_pair = ExperiencePair(
+        first=jax.tree.map(lambda leaf: leaf[first_ids], state.experience),
+        second=jax.tree.map(lambda leaf: leaf[second_ids], state.experience),
     )
-    second = _replace_frame_stacked_sample(
+    experience_pair = _replace_frame_stacked_pair(
         state=state,
-        sample=second,
-        entry_ids=second_ids,
+        experience_pair=experience_pair,
+        second_ids=second_ids,
         max_length=max_length,
         frame_stacking=frame_stacking,
         frame_stacking_field=frame_stacking_field,
         frame_stack_axis=frame_stack_axis,
     )
 
-    return TransitionSample(experience=ExperiencePair(first=first, second=second))
+    return TransitionSample(experience=experience_pair)
 
 
 def can_sample(
@@ -355,59 +348,68 @@ def _compact_frame_stacked_entry(
     return entry
 
 
-def _replace_frame_stacked_sample(
+def _replace_frame_stacked_pair(
     state: EpisodeAwareFlatBufferState,
-    sample: Experience,
-    entry_ids: jax.Array,
+    experience_pair: ExperiencePair[Experience],
+    second_ids: jax.Array,
     max_length: int,
     frame_stacking: int,
     frame_stacking_field: str,
     frame_stack_axis: int,
-) -> Experience:
+) -> ExperiencePair[Experience]:
     if frame_stacking == 1:
-        return sample
+        return experience_pair
 
-    sample = dict(sample)
-    sample[frame_stacking_field] = _get_frame_stack(
+    frame_stacks = _get_transition_frame_stacks(
         state=state,
-        entry_ids=entry_ids,
+        second_ids=second_ids,
         max_length=max_length,
         frame_stacking=frame_stacking,
         frame_stacking_field=frame_stacking_field,
         frame_stack_axis=frame_stack_axis,
     )
-    return sample
+    first = dict(experience_pair.first)
+    second = dict(experience_pair.second)
+    first[frame_stacking_field] = frame_stacks.first
+    second[frame_stacking_field] = frame_stacks.second
+    return ExperiencePair(first=first, second=second)
 
 
-def _get_frame_stack(
+def _get_transition_frame_stacks(
     state: EpisodeAwareFlatBufferState,
-    entry_ids: jax.Array,
+    second_ids: jax.Array,
     max_length: int,
     frame_stacking: int,
     frame_stacking_field: str,
     frame_stack_axis: int,
-) -> jax.Array:
+) -> ExperiencePair[jax.Array]:
     frame_offsets = jnp.arange(
-        frame_stacking - 1,
+        frame_stacking,
         -1,
         -1,
         dtype=INDEX_DTYPE,
     )
-    frame_ids = (entry_ids[:, None] - frame_offsets[None, :]) % max_length
+    frame_ids = (second_ids[:, None] - frame_offsets[None, :]) % max_length
     frames = state.experience[frame_stacking_field][frame_ids]
 
     valid_mask = _get_frame_stack_valid_mask(
         state=state,
-        entry_ids=entry_ids,
+        entry_ids=second_ids,
         max_length=max_length,
-        frame_stacking=frame_stacking,
+        frame_stacking=frame_stacking + 1,
     )
     valid_mask = valid_mask.reshape(*valid_mask.shape, *([1] * (frames.ndim - 2)))
     frames = jnp.where(valid_mask, frames, jnp.zeros_like(frames))
 
-    return _move_frame_stack_axis(
-        frames=frames,
-        frame_stack_axis=frame_stack_axis,
+    return ExperiencePair(
+        first=_move_frame_stack_axis(
+            frames=frames[:, :-1],
+            frame_stack_axis=frame_stack_axis,
+        ),
+        second=_move_frame_stack_axis(
+            frames=frames[:, 1:],
+            frame_stack_axis=frame_stack_axis,
+        ),
     )
 
 
