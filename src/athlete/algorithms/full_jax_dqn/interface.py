@@ -4,6 +4,8 @@ import pickle
 from typing import Tuple, Any, Dict
 from dataclasses import dataclass
 
+from athlete.algorithms.full_jax_dqn.function import resolve_dotted_reference
+
 # TODO add proper interface structure for make functions
 
 # TODO maybe write a function protocol for update functions to take update condition and return logging info
@@ -77,27 +79,3 @@ class EvaluationAgent(ABC):
     def save(self, save_path: str, **kwargs) -> None: ...
 
     # TODO add abstract method for evaluation agents once implemented on lower levels
-
-
-def resolve_dotted_reference(path: str):
-    parts = path.split(".")
-
-    for split_index in range(len(parts), 0, -1):
-        module_path = ".".join(parts[:split_index])
-        try:
-            obj = importlib.import_module(module_path)
-            break
-        except ModuleNotFoundError as error:
-            missing_module = error.name
-            if missing_module is None or not (
-                module_path == missing_module
-                or module_path.startswith(f"{missing_module}.")
-            ):
-                raise
-    else:
-        raise ImportError(f"Could not import any module from path: {path}")
-
-    for attribute_name in parts[split_index:]:
-        obj = getattr(obj, attribute_name)
-
-    return obj
