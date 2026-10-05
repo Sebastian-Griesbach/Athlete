@@ -60,6 +60,7 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
     pre_activation_module: Optional[Callable] = None
     pre_activation_module_kwargs: Dict = field(default_factory=dict)
     skip_connections: bool = False
+    zero_output: bool = False
 
     def setup(self):
         """Set up the layers of the network."""
@@ -71,14 +72,22 @@ class FlaxNonLinearFullyConnectedNet(nn.Module):
             nn.Dense(
                 features=self.layer_dims[i + 1],
                 kernel_init=(
-                    nn.initializers.lecun_uniform()
-                    if self.weight_init is None
-                    else self.weight_init
+                    (
+                        nn.initializers.lecun_uniform()
+                        if self.weight_init is None
+                        else self.weight_init
+                    )
+                    if not (self.zero_output and i == num_linear_layers - 1)
+                    else (nn.initializers.zeros_init())
                 ),
                 bias_init=(
-                    nn.initializers.uniform(scale=1 / jnp.sqrt(self.layer_dims[i]))
-                    if self.bias_init is None
-                    else self.bias_init
+                    (
+                        nn.initializers.uniform(scale=1 / jnp.sqrt(self.layer_dims[i]))
+                        if self.bias_init is None
+                        else self.bias_init
+                    )
+                    if not (self.zero_output and i == num_linear_layers - 1)
+                    else (nn.initializers.zeros_init())
                 ),
                 name=f"dense_{i+1}",
             )
